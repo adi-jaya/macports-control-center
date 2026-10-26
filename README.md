@@ -16,8 +16,22 @@ Folder ini menyimpan seluruh panduan, catatan riwayat migrasi, konfigurasi siste
 | 📄 [**`FRESH_INSTALL_GUIDE.md`**](FRESH_INSTALL_GUIDE.md) | **Panduan Setup Laravel dari Nol:** Tutorial komprehensif setup lingkungan Laravel di Mac baru/reinstall, manajemen multi-versi PHP (8.1 s/d 8.4+), isolasi concurrent FPM pools, manajemen MariaDB/MySQL, dan uninstaller bersih. |
 | 📄 [`FINAL_MACPORTS_ENVIRONMENT_SETUP.md`](FINAL_MACPORTS_ENVIRONMENT_SETUP.md) | **Dokumentasi Utama:** Detail teknis stack yang saat ini aktif (PHP 8.3, Nginx, MariaDB, Composer, Node), port/socket, dan status layanan. |
 | 📄 [`HANDOFF_MACPORTS_MIGRATION.md`](HANDOFF_MACPORTS_MIGRATION.md) | **Riwayat & Latar Belakang:** Catatan teknis migrasi dari FlyEnv dan Herd (alasan inkompatibilitas C++ SDK macOS Monterey, migrasi 24 database). |
+| 📄 [**`AGENTS.md`**](AGENTS.md) | **Petunjuk & Aturan AI Agents:** Pedoman arsitektur, guardrails, konvensi hak akses file, dan perintah terminal untuk AI coding assistant. |
 | 📁 [`scripts/`](scripts/) | **Koleksi Skrip Otomasi:** Berisi skrip shell yang digunakan selama proses migrasi (`setup_webserver.sh`, `migrate_mariadb.sh`, `cleanup_herd_root.sh`, `cleanup_flyenv_root.sh`). |
 | 📁 [`config_templates/`](config_templates/) | **Salinan Konfigurasi:** Template cadangan `nginx.conf`, `php.ini`, `php-fpm.conf`, `www.conf`, dan contoh blok vhost server. |
+
+---
+
+## 💻 Teknologi & Bahasa Pemrograman Repositori
+
+Repositori ini dibangun dengan arsitektur mandiri (*zero-dependency build*) menggunakan kombinasi bahasa dan teknologi:
+
+* 🐘 **PHP (Native 8.3):** Menjadi backend mini-router pada [`index.php`](index.php) untuk membaca file markdown secara aman dan menyajikannya ke viewer browser.
+* ⚡ **JavaScript (ES6+) & Marked.js:** Parser Markdown sisi browser via CDN [`marked.js`](https://cdn.jsdelivr.net/npm/marked/marked.min.js) untuk rendering dinamis tanpa langkah build (*no build step*).
+* 🎨 **HTML5 & CSS3:** Desain antarmuka *Dark Theme* modern (`#0f172a`), tata letak responsif Flexbox, typography Apple System Font, dan navigasi sidebar interaktif.
+* 🐚 **Bash Shell (`.sh`):** Skrip shell POSIX di direktori [`scripts/`](scripts/) untuk otomasi sinkronisasi data MariaDB, setup konfigurasi Nginx/PHP, serta pembersihan background daemon.
+* 📝 **GitHub Flavored Markdown (GFM):** Standar penulisan seluruh berkas dokumentasi (`*.md`).
+* ⚙️ **Konfigurasi Server (Nginx Conf & INI):** Konfigurasi web server dan runtime di [`config_templates/`](config_templates/).
 
 ---
 
