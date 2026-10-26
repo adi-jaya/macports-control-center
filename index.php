@@ -1,7 +1,7 @@
 <?php
 $files = [
     'README.md' => 'Panduan Utama & Cheatsheet CLI',
-    'FRESH_INSTALL_GUIDE.md' => 'Panduan Setup dari Nol (Fresh Install / Mac Baru)',
+    'FRESH_INSTALL_GUIDE.md' => 'Panduan Setup Laravel & Multi-Versi dari Nol',
     'FINAL_MACPORTS_ENVIRONMENT_SETUP.md' => 'Dokumentasi Konfigurasi & Stack MacPorts',
     'HANDOFF_MACPORTS_MIGRATION.md' => 'Riwayat & Detail Migrasi (FlyEnv & Herd)'
 ];

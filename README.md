@@ -12,7 +12,7 @@ Folder ini menyimpan seluruh panduan, catatan riwayat migrasi, konfigurasi siste
 
 | Berkas / Direktori | Deskripsi |
 | :--- | :--- |
-| 📄 [**`FRESH_INSTALL_GUIDE.md`**](FRESH_INSTALL_GUIDE.md) | **Panduan Setup dari Nol:** Tutorial lengkap langkah demi langkah konfigurasi dari awal untuk Mac baru atau setelah install ulang macOS. |
+| 📄 [**`FRESH_INSTALL_GUIDE.md`**](FRESH_INSTALL_GUIDE.md) | **Panduan Setup Laravel dari Nol:** Tutorial komprehensif setup lingkungan Laravel di Mac baru/reinstall, manajemen multi-versi PHP (8.1 s/d 8.4+), isolasi concurrent FPM pools, manajemen MariaDB/MySQL, dan uninstaller bersih. |
 | 📄 [`FINAL_MACPORTS_ENVIRONMENT_SETUP.md`](FINAL_MACPORTS_ENVIRONMENT_SETUP.md) | **Dokumentasi Utama:** Detail teknis stack yang saat ini aktif (PHP 8.3, Nginx, MariaDB, Composer, Node), port/socket, dan status layanan. |
 | 📄 [`HANDOFF_MACPORTS_MIGRATION.md`](HANDOFF_MACPORTS_MIGRATION.md) | **Riwayat & Latar Belakang:** Catatan teknis migrasi dari FlyEnv dan Herd (alasan inkompatibilitas C++ SDK macOS Monterey, migrasi 24 database). |
 | 📁 [`scripts/`](scripts/) | **Koleksi Skrip Otomasi:** Berisi skrip shell yang digunakan selama proses migrasi (`setup_webserver.sh`, `migrate_mariadb.sh`, `cleanup_herd_root.sh`). |
