@@ -1,30 +1,68 @@
-# 🤖 AGENTS.md — Operational Playbook untuk AI Coding Agents
+# 🤖 AGENTS.md — Panduan Arsitektur, Tech Stack & Operasional untuk AI Coding Agents
 
-Pusat instruksi operasional untuk AI Coding Agent di repositori [`MacPorts_Docs`](file:///Users/adijaya/Documents/MacPorts_Docs) dan lingkungan host macOS ini.
+Pusat instruksi resmi untuk AI Coding Agent (Antigravity, Claude Code, OpenAI Codex, Cursor, Windsurf, Copilot, dll.) yang bekerja di repositori [`MacPorts_Docs`](file:///Users/adijaya/Documents/MacPorts_Docs) maupun pada lingkungan host macOS ini.
 
 ---
 
 ## 1. Mental Model: Peran Repositori
 
-Repositori ini menjalankan dua fungsi saling terikat:
-1. **Live Knowledge Base:** Dokumentasi web development lokal yang disajikan ke browser melalui symlink:
+Repositori ini menjalankan dua peran saling terikat:
+1. **Live Knowledge Base:** Dokumentasi web development lokal yang disajikan langsung ke browser melalui symlink:
    ```text
    /Users/adijaya/Sites/localhost/docs  ──(symlink)──>  /Users/adijaya/Documents/MacPorts_Docs
    ```
-   Akses browser: [http://localhost/docs/](http://localhost/docs/) (dinamis via [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php)).
-2. **Configuration Source of Truth:** Template konfigurasi referensi ([`config_templates/`](file:///Users/adijaya/Documents/MacPorts_Docs/config_templates)) dan skrip pemulihan/otomasi ([`scripts/`](file:///Users/adijaya/Documents/MacPorts_Docs/scripts)) untuk stack web dev host (Laravel, PHP, Nginx, MariaDB).
+   Akses browser lokal: [http://localhost/docs/](http://localhost/docs/) (dinamis via [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php)).
+2. **Configuration Source of Truth:** Template konfigurasi referensi ([`config_templates/`](file:///Users/adijaya/Documents/MacPorts_Docs/config_templates)) dan skrip pemulihan/otomasi ([`scripts/`](file:///Users/adijaya/Documents/MacPorts_Docs/scripts)) untuk seluruh stack web dev host (Laravel, PHP, Nginx, MariaDB).
 3. **Remote Sinkron:** GitHub publik [**adi-jaya/macports-webdev-setup**](https://github.com/adi-jaya/macports-webdev-setup) pada branch `main`.
 
 ---
 
-## 2. Context Pointers (Progressive Disclosure)
+## 2. Teknologi & Bahasa Pemrograman Repositori Ini
 
-Buka dokumen terkait hanya saat pemicu (*trigger*) aktif. Jangan memuat seluruh dokumen ke dalam konteks jika tugas hanya menyentuh satu cabang:
+Repositori dokumentasi ini dibangun dengan pendekatan *zero-dependency build* (tanpa Node bundler atau composer vendor) menggunakan kombinasi bahasa dan teknologi berikut:
+
+| Lapisan / Komponen | Bahasa & Teknologi | Lokasi Berkas | Peran & Detail Implementasi |
+| :--- | :--- | :--- | :--- |
+| **Backend Web Viewer** | **PHP** (Native 8.3+) | [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php) | Mini-controller mandiri tanpa framework. Menangani routing `?file=`, sanitasi input, membaca markdown via `file_get_contents`, dan menyajikan konten ke frontend dalam format JSON. |
+| **Frontend Markdown Parser** | **JavaScript (ES6+)** | [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php) | Parsing Markdown ke elemen DOM secara dinamis di browser menggunakan CDN [`marked.js`](https://cdn.jsdelivr.net/npm/marked/marked.min.js) (*no build step*). |
+| **Styling & Antarmuka** | **HTML5 & CSS3** | [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php) | Tata letak Flexbox modern dengan *Dark Theme* (`#0f172a`, `#1e293b`, `#38bdf8`), tipografi Apple System Font, styling tabel Markdown, dan navigasi sidebar interaktif. |
+| **Skrip Otomasi Sistem** | **POSIX Bash Shell** | [`scripts/*.sh`](file:///Users/adijaya/Documents/MacPorts_Docs/scripts) | Skrip shell (`#!/bin/bash` dengan `set -e`) untuk sinkronisasi database (`rsync`), konfigurasi direktori sistem (`chown`/`chmod`), dan manajemen launch daemon (`launchctl`). |
+| **Format Dokumentasi** | **Markdown (GFM)** | `*.md` | Menggunakan GitHub Flavored Markdown (tabel, badge, blockquotes, syntax highlighting) yang dirender serentak di GitHub dan web viewer lokal. |
+| **Konfigurasi Server** | **Nginx Conf & INI** | [`config_templates/`](file:///Users/adijaya/Documents/MacPorts_Docs/config_templates) | Sintaks konfigurasi server block Nginx (`.conf`), runtime PHP (`php.ini`), dan pool PHP-FPM (`www.conf`). |
+| **Version Control** | **Git** | `.git/`, `.gitignore` | Pelacakan versi dan sinkronisasi ke remote GitHub `origin/main`. |
+
+---
+
+## 3. Peta Arsitektur Host & Runtime Aktif
+
+Mesin host: **macOS Monterey 12.7.6 (Build 21H1320) — Arsitektur Intel x86_64**.
+
+### A. Komponen Layanan Aktif (*Live Runtime*)
+| Komponen | Versi | Status | Port / Socket / Jalur | File Konfigurasi Aktif di Sistem |
+| :--- | :--- | :---: | :--- | :--- |
+| **Nginx** | 1.30.6 | ✅ Berjalan | Port `80` (Dashboard), Port `8080+` (Proyek) | `/opt/local/etc/nginx/nginx.conf`<br>Vhosts: `/opt/local/etc/nginx/servers/*.conf` |
+| **PHP CLI** | 8.3.36 | ✅ Aktif | `/opt/local/bin/php` | `/opt/local/etc/php83/php.ini` |
+| **PHP-FPM** | 8.3.36 | ✅ Berjalan | `127.0.0.1:9000` (User: `adijaya:staff`) | `/opt/local/etc/php83/php-fpm.d/www.conf` |
+| **MariaDB** | 10.11.19 | ✅ Berjalan | Port `3306`, Socket `/tmp/mysql.sock` | `/opt/local/etc/mariadb-10.11/my.cnf`<br>Data: `/opt/local/var/db/mariadb-10.11` (24 DB) |
+| **Composer** | 2.8.12 | ✅ Aktif | `~/.local/bin/composer` | Menggunakan PHP 8.3 MacPorts |
+| **Node.js** | v24.22.1 | ✅ Aktif | Dikelola via `fnm` (MacPorts) | Shell alias di `~/.zshrc` |
+
+### B. Konvensi Lingkungan Kritis (*Unwritten Environment Conventions*)
+- **Direktori Server Blocks Nginx (`/opt/local/etc/nginx/servers/`):** Dimiliki oleh `adijaya:admin`. Tulis dan edit berkas vhost langsung **tanpa `sudo`**.
+- **PHP-FPM Worker User:** Wajib dikonfigurasi sebagai `user = adijaya` dan `group = staff`. Konfigurasi ini menjamin berkas `storage/` dan `bootstrap/cache` Laravel dapat ditulis serentak oleh web server dan CLI tanpa konflik hak akses.
+- **Sudoers MacPorts:** User `adijaya` memiliki hak passwordless sudo untuk perintah MacPorts melalui file `/etc/sudoers.d/macports` (`NOPASSWD: /opt/local/bin/port`).
+- **Alasan Larangan Laravel Herd:** Binary PHP Herd membutuhkan SDK macOS 15+ (`minos 15.0`) dan memanggil simbol C++ `__ZNSt3__122__libcpp_verbose_abortEPKcz` yang absen di macOS Monterey (Herd Bug #1600). Herd menyebabkan *instant crash* dan telah dibersihkan total.
+
+---
+
+## 4. Context Pointers (Progressive Disclosure)
+
+Konsultasikan dokumen berikut hanya saat pemicu (*trigger*) yang relevan aktif:
 
 | Berkas / Direktori | Trigger Pemicu Konsultasi | Cakupan Material |
 | :--- | :--- | :--- |
-| [`VIRTUAL_HOSTS_AND_DOMAINS_GUIDE.md`](file:///Users/adijaya/Documents/MacPorts_Docs/VIRTUAL_HOSTS_AND_DOMAINS_GUIDE.md) | **Setup Vhost / Domain / SSL:** Saat membuat server block baru, domain `*.test` (`/etc/hosts` atau `dnsmasq`), atau HTTPS lokal via `mkcert`. | Panduan langkah vhost port-based, config dnsmasq, sertifikat SSL lokal, dan template server Laravel/SPA. |
-| [`FRESH_INSTALL_GUIDE.md`](file:///Users/adijaya/Documents/MacPorts_Docs/FRESH_INSTALL_GUIDE.md) | **Reinstall / Multi-PHP Pools / Database:** Saat setup Mac dari nol, menjalankan concurrent multi-PHP FPM (8.1 s/d 8.4), atau konfigurasi database MariaDB/MySQL. | Rumus paket MacPorts, alokasi port multi-FPM (9081, 9082, 9083), inisialisasi MariaDB, dan uninstaller bersih. |
+| [`VIRTUAL_HOSTS_AND_DOMAINS_GUIDE.md`](file:///Users/adijaya/Documents/MacPorts_Docs/VIRTUAL_HOSTS_AND_DOMAINS_GUIDE.md) | **Setup Vhost / Domain / SSL:** Saat membuat server block baru, domain `*.test` (`/etc/hosts` atau `dnsmasq`), atau HTTPS lokal via `mkcert`. | Panduan vhost port-based, config dnsmasq, sertifikat SSL lokal, dan template server Laravel/SPA. |
+| [`FRESH_INSTALL_GUIDE.md`](file:///Users/adijaya/Documents/MacPorts_Docs/FRESH_INSTALL_GUIDE.md) | **Reinstall / Multi-PHP Pools / Database:** Saat setup Mac baru dari nol, menjalankan concurrent multi-PHP FPM (8.1 s/d 8.4), atau konfigurasi database MariaDB/MySQL. | Rumus paket MacPorts, alokasi port multi-FPM (9081, 9082, 9083), inisialisasi MariaDB, dan uninstaller bersih. |
 | [`FINAL_MACPORTS_ENVIRONMENT_SETUP.md`](file:///Users/adijaya/Documents/MacPorts_Docs/FINAL_MACPORTS_ENVIRONMENT_SETUP.md) | **Audit Snapshot Host:** Saat memverifikasi versi komponen aktif, alokasi port default, atau riwayat database terpasang. | Status teruji: PHP 8.3.36, Nginx 1.30.6, MariaDB 10.11.19, Composer 2.8.12, Node v24 via fnm. |
 | [`HANDOFF_MACPORTS_MIGRATION.md`](file:///Users/adijaya/Documents/MacPorts_Docs/HANDOFF_MACPORTS_MIGRATION.md) | **Riset Historis Keputusan:** Saat membutuhkan latar belakang mengapa FlyEnv atau Herd ditinggalkan. | Catatan bug SDK macOS 15+ libcpp pada Herd (Issue #1600) dan migrasi 24 database FlyEnv. |
 | [`config_templates/`](file:///Users/adijaya/Documents/MacPorts_Docs/config_templates) | **Sinkronisasi Konfigurasi Acuan:** Saat memperbarui template standar `nginx.conf`, `php.ini`, atau `www.conf`. | Salinan acuan (BUKAN file aktif runtime sistem di `/opt/local/etc/`). |
@@ -32,32 +70,15 @@ Buka dokumen terkait hanya saat pemicu (*trigger*) aktif. Jangan memuat seluruh 
 
 ---
 
-## 3. Host Runtime & Hak Kepemilikan (Crucial State)
-
-Mesin host: **macOS Monterey 12.7.6 (Intel x86_64)**.
-
-### A. Peta Runtime Aktif
-- **Web Server:** Nginx 1.30.6 (`/opt/local/sbin/nginx`) | Konfigurasi aktif: `/opt/local/etc/nginx/nginx.conf` | Vhosts: `/opt/local/etc/nginx/servers/*.conf`
-- **PHP CLI & FPM:** PHP 8.3.36 (`/opt/local/bin/php`) | FPM: `/opt/local/sbin/php-fpm83` pada `127.0.0.1:9000` | Pool: `/opt/local/etc/php83/php-fpm.d/www.conf`
-- **Database:** MariaDB 10.11.19 (`/opt/local/lib/mariadb-10.11/bin/mysqld`) pada port `3306` & Socket `/tmp/mysql.sock` | Datadir: `/opt/local/var/db/mariadb-10.11` (24 database)
-- **Node & Package Tools:** Node v24.22.1 (via `fnm`), Composer 2.8.12 (`~/.local/bin/composer`)
-
-### B. Unwritten Environment Conventions
-- **Nginx Servers Directory (`/opt/local/etc/nginx/servers/`):** Dimiliki oleh `adijaya:admin`. Tulis berkas langsung **tanpa `sudo`**.
-- **PHP-FPM Worker User:** Dikonfigurasi sebagai `user = adijaya` dan `group = staff`. Menjaga berkas `storage/` dan `bootstrap/cache` Laravel dapat ditulis serentak oleh web server dan CLI tanpa konflik permission.
-- **Sudoers MacPorts:** User `adijaya` memiliki hak passwordless sudo untuk `/opt/local/bin/port` melalui `/etc/sudoers.d/macports`.
-
----
-
-## 4. Standard Operating Procedures (SOP) dengan Completion Criteria
+## 5. Standard Operating Procedures (SOP) dengan Completion Criteria
 
 ### 📋 SOP 1: Penambahan Dokumen Baru ke Repositori
 1. Tulis berkas Markdown baru di root: `/Users/adijaya/Documents/MacPorts_Docs/<NAMA_FILE>.md`.
 2. Buka [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php), daftarkan nama berkas dan labelnya ke dalam array `$files`.
-3. Tambahkan baris tautan pada tabel di [`README.md`](file:///Users/adijaya/Documents/MacPorts_Docs/README.md) dan tabel Bagian 2 di dokumen ini.
+3. Tambahkan baris tautan pada tabel di [`README.md`](file:///Users/adijaya/Documents/MacPorts_Docs/README.md) dan tabel Bagian 4 di dokumen ini.
 4. **Completion Criterion:**
    - Jalankan: `curl -sI "http://localhost/docs/?file=<NAMA_FILE>.md"`
-   - Baris status wajib `HTTP/1.1 200 OK`.
+   - Baris status wajib menampilkan `HTTP/1.1 200 OK`.
 
 ### 📋 SOP 2: Penambahan Virtual Host Proyek Laravel Baru
 1. Deteksi port yang telah terpakai:
@@ -120,7 +141,7 @@ Mesin host: **macOS Monterey 12.7.6 (Intel x86_64)**.
 
 ---
 
-## 5. Positive Guardrails & Target Actions
+## 6. Positive Guardrails & Target Actions
 
 Terapkan target tindakan berikut pada setiap operasi:
 
@@ -134,7 +155,7 @@ Terapkan target tindakan berikut pada setiap operasi:
 
 ---
 
-## 6. Efisiensi Token, Git, dan Estimasi Nilai
+## 7. Efisiensi Token, Git, dan Estimasi Nilai
 
 - **Token Optimization (RTK):** Gunakan utilitas proxy `rtk` (Rust Token Killer) untuk mengeksekusi operasi dev dan perintah terminal guna menghemat token konteks hingga 60-90%.
 - **Git Audit Rules:**
