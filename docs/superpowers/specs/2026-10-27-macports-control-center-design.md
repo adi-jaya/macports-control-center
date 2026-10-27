@@ -80,13 +80,27 @@ Sebelum menetapkan desain akhir, empat pendekatan arsitektur telah dievaluasi:
 
 ## 5. Spesifikasi Arsitektur & Komponen Aplikasi
 
-### A. Tata Letak Direktori Proyek
-Aplikasi ditempatkan sebagai proyek mandiri pada `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter` (mengikuti konvensi penamaan folder PascalCase di `/Users/adijaya/MyFiles/Projects/`):
+### A. Tata Letak Direktori Proyek & Strategi Migrasi Repositori
+Seluruh repositori `MacPorts_Docs` (`adi-jaya/macports-webdev-setup`) dilebur dan dipindahkan ke `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter` (mengikuti konvensi penamaan folder PascalCase di `/Users/adijaya/MyFiles/Projects/`), sedangkan berkas `index.php` (viewer PHP lama) dihapus.
+
+Agar **sesi percakapan (conversation) aktif saat ini** maupun referensi lama tetap terhubung 100% tanpa terputus, selama transisi dibuatkan jembatan *symbolic link*:
+```text
+/Users/adijaya/Documents/MacPorts_Docs ──(symlink)──> /Users/adijaya/MyFiles/Projects/MacPortsControlCenter
+```
+*(Symlink ini menjaga working directory sesi saat ini tetap valid, dan dapat dihapus kapan saja setelah Anda membuka sesi langsung dari `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter`).*
 
 ```text
 /Users/adijaya/MyFiles/Projects/MacPortsControlCenter/
 ├── Package.swift                 # Definisi Swift Package (target macOS 12.0+)
 ├── build-app.sh                  # Skrip kompilasi & pembuat bundel "MacPorts Control Center.app"
+├── README.md                     # Dokumentasi utama (dibundel juga ke dalam aplikasi)
+├── VIRTUAL_HOSTS_AND_DOMAINS_GUIDE.md
+├── FRESH_INSTALL_GUIDE.md
+├── FINAL_MACPORTS_ENVIRONMENT_SETUP.md
+├── HANDOFF_MACPORTS_MIGRATION.md
+├── AGENTS.md
+├── config_templates/             # Template acuan nginx.conf, php.ini, www.conf, vhost
+├── scripts/                      # Skrip otomasi POSIX sh
 ├── Resources/
 │   └── Info.plist                # Metadata bundel macOS (LSMinimumSystemVersion 12.0)
 └── Sources/
@@ -112,7 +126,7 @@ Aplikasi ditempatkan sebagai proyek mandiri pada `/Users/adijaya/MyFiles/Project
             ├── DatabaseView.swift    # Halaman 4: MariaDB/MySQL, 24 DBs, Backup/Import .sql
             ├── PackagesView.swift    # Halaman 5: Universal port search, installed, port select
             ├── LogsView.swift        # Halaman 6: Live Log Tailer (Nginx, PHP-FPM, MariaDB)
-            ├── DocsView.swift        # Halaman 7: Native Markdown Reader untuk MacPorts_Docs/*.md
+            ├── DocsView.swift        # Halaman 7: Native Markdown Reader (membaca *.md dari Bundle/Repo)
             ├── TerminalDrawerView.swift # Panel bawah: Live stdout/stderr + tombol Cancel/Clear
             └── CommandPaletteView.swift # Overlay Cmd + K
 ```
