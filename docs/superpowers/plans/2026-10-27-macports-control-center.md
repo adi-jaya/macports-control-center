@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build and package **MacPorts Control Center**, a native macOS (`SwiftUI` + `AppKit`) desktop and Menu Bar GUI application at `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter` that manages MacPorts services, Nginx virtual hosts, multi-PHP FPM & extensions, MariaDB databases, universal MacPorts packages, server logs, and built-in Markdown documentation with ~15–22 MB RAM usage and zero PHP/WebView dependencies.
+**Goal:** Build and package **MacPorts Control Center**, a native macOS (`SwiftUI` + `AppKit`) desktop and Menu Bar GUI application at `/Users/adijaya/MyFiles/Projects/macports-control-center` that manages MacPorts services, Nginx virtual hosts, multi-PHP FPM & extensions, MariaDB databases, universal MacPorts packages, server logs, and built-in Markdown documentation with ~15–22 MB RAM usage and zero PHP/WebView dependencies.
 
 **Architecture:** A modular Swift Package (`macosx12.0` deployment target) split into a testable core/UI library (`MacPortsControlCenter`) and a lightweight executable entry point (`MacPortsControlCenterApp`), packaged into `build/MacPorts Control Center.app` via `build-app.sh`. All system interactions run asynchronously through a serialized `CommandRunner` streaming `stdout`/`stderr` into a native `NSTextView` docked terminal drawer.
 
@@ -526,7 +526,7 @@ rtk git commit -m "feat(state): add AppState, MainWindowView, NSTextView Termina
 - Produces:
   - Complete 7 feature views wired into `MainWindowView`
   - `MenuBarController` (`NSStatusItem` in `MainApp.swift`) showing live stack status and quick Start/Stop/Restart actions in the macOS Menu Bar
-  - Executable bundle `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter/build/MacPorts Control Center.app`
+  - Executable bundle `/Users/adijaya/MyFiles/Projects/macports-control-center/build/MacPorts Control Center.app`
 
 - [ ] **Step 1: Implement the 7 feature views in `Sources/MacPortsControlCenter/Views/` and `MainApp.swift` with `NSStatusItem` Menu Bar controller**
 
@@ -545,7 +545,7 @@ rtk git commit -m "feat(state): add AppState, MainWindowView, NSTextView Termina
 Run: `bash build-app.sh && swift test`
 Expected: `swift test` passes all unit tests AND `build/MacPorts Control Center.app/Contents/MacOS/MacPortsControlCenterApp` exists and is executable.
 
-- [ ] **Step 3: Update `README.md` and `AGENTS.md` to reflect the new Swift Native GUI architecture and `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter` location**
+- [ ] **Step 3: Update `README.md` and `AGENTS.md` to reflect the new Swift Native GUI architecture and `/Users/adijaya/MyFiles/Projects/macports-control-center` location**
 
 Update the documentation tables and build/run instructions in `README.md` and `AGENTS.md`.
 

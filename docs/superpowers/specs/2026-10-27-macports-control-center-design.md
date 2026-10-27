@@ -3,8 +3,8 @@
 - **Tanggal:** 27 Oktober 2026
 - **Target Platform:** macOS Monterey 12.0+ (`x86_64` Intel & `arm64` Apple Silicon)
 - **Teknologi Utama:** Swift Native (`SwiftUI` + `AppKit`, Swift 5.7+)
-- **Direktori Proyek Aplikasi:** `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter`
-- **Repositori GitHub:** `adi-jaya/MacPortsControlCenter` (`https://github.com/adi-jaya/MacPortsControlCenter`)
+- **Direktori Proyek Aplikasi:** `/Users/adijaya/MyFiles/Projects/macports-control-center`
+- **Repositori GitHub:** `adi-jaya/macports-control-center` (`https://github.com/adi-jaya/macports-control-center`)
 
 ---
 
@@ -81,16 +81,16 @@ Sebelum menetapkan desain akhir, empat pendekatan arsitektur telah dievaluasi:
 ## 5. Spesifikasi Arsitektur & Komponen Aplikasi
 
 ### A. Tata Letak Direktori Proyek & Strategi Migrasi Repositori
-Seluruh repositori `MacPorts_Docs` (`adi-jaya/macports-webdev-setup`) dilebur dan dipindahkan ke `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter` (mengikuti konvensi penamaan folder PascalCase di `/Users/adijaya/MyFiles/Projects/`), sedangkan berkas `index.php` (viewer PHP lama) dihapus.
+Seluruh repositori `MacPorts_Docs` (`adi-jaya/macports-webdev-setup`) dilebur dan dipindahkan ke `/Users/adijaya/MyFiles/Projects/macports-control-center` (mengikuti konvensi penamaan folder PascalCase di `/Users/adijaya/MyFiles/Projects/`), sedangkan berkas `index.php` (viewer PHP lama) dihapus.
 
 Agar **sesi percakapan (conversation) aktif saat ini** maupun referensi lama tetap terhubung 100% tanpa terputus, selama transisi dibuatkan jembatan *symbolic link*:
 ```text
-/Users/adijaya/Documents/MacPorts_Docs ──(symlink)──> /Users/adijaya/MyFiles/Projects/MacPortsControlCenter
+/Users/adijaya/Documents/MacPorts_Docs ──(symlink)──> /Users/adijaya/MyFiles/Projects/macports-control-center
 ```
-*(Symlink ini menjaga working directory sesi saat ini tetap valid, dan dapat dihapus kapan saja setelah Anda membuka sesi langsung dari `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter`).*
+*(Symlink ini menjaga working directory sesi saat ini tetap valid, dan dapat dihapus kapan saja setelah Anda membuka sesi langsung dari `/Users/adijaya/MyFiles/Projects/macports-control-center`).*
 
 ```text
-/Users/adijaya/MyFiles/Projects/MacPortsControlCenter/
+/Users/adijaya/MyFiles/Projects/macports-control-center/
 ├── Package.swift                 # Definisi Swift Package (target macOS 12.0+)
 ├── build-app.sh                  # Skrip kompilasi & pembuat bundel "MacPorts Control Center.app"
 ├── README.md                     # Dokumentasi utama (dibundel juga ke dalam aplikasi)
@@ -206,6 +206,6 @@ Agar **sesi percakapan (conversation) aktif saat ini** maupun referensi lama tet
 ## 6. Keputusan Builder (*What's Left to the Builder*)
 
 Hal-hal detail implementasi berikut diserahkan kepada *builder*:
-1. **Kompilasi & Pembungkusan `.app`:** Menyusun `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter/Package.swift` dan skrip `build-app.sh` yang mengompilasi binary Swift (`swift build -c release`) lalu membungkusnya ke `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter/build/MacPorts Control Center.app` (serta opsional memasang ke `/Applications`).
+1. **Kompilasi & Pembungkusan `.app`:** Menyusun `/Users/adijaya/MyFiles/Projects/macports-control-center/Package.swift` dan skrip `build-app.sh` yang mengompilasi binary Swift (`swift build -c release`) lalu membungkusnya ke `/Users/adijaya/MyFiles/Projects/macports-control-center/build/MacPorts Control Center.app` (serta opsional memasang ke `/Applications`).
 2. **Integrasi Dokumentasi Repositori:** Memperbarui [`README.md`](file:///Users/adijaya/Documents/MacPorts_Docs/README.md) dan [`AGENTS.md`](file:///Users/adijaya/Documents/MacPorts_Docs/AGENTS.md) setelah aplikasi selesai dibangun untuk mencatat cara menjalankan dan mengompilasi aplikasi GUI ini.
 3. **Parser Markdown Ringan Native:** Menggunakan parser Markdown berbasis Swift/`NSAttributedString` untuk halaman **MacPorts Docs** agar tabel, blok kode, dan *heading* tampil rapi di komponen native `NSTextView` tanpa membutuhkan `WKWebView`.

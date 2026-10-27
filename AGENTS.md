@@ -1,17 +1,17 @@
 # 🤖 AGENTS.md — Panduan Arsitektur, Tech Stack & Operasional untuk AI Coding Agents
 
-Pusat instruksi resmi untuk AI Coding Agent (Antigravity, Claude Code, OpenAI Codex, Cursor, Windsurf, Copilot, dll.) yang bekerja di repositori [`MacPortsControlCenter`](file:///Users/adijaya/MyFiles/Projects/MacPortsControlCenter) maupun pada lingkungan host macOS ini.
+Pusat instruksi resmi untuk AI Coding Agent (Antigravity, Claude Code, OpenAI Codex, Cursor, Windsurf, Copilot, dll.) yang bekerja di repositori [`macports-control-center`](file:///Users/adijaya/MyFiles/Projects/macports-control-center) maupun pada lingkungan host macOS ini.
 
 ---
 
 ## 1. Mental Model: Peran Repositori
 
-Repositori ini telah dimigrasikan dari `~/Documents/MacPorts_Docs` ke [`/Users/adijaya/MyFiles/Projects/MacPortsControlCenter`](file:///Users/adijaya/MyFiles/Projects/MacPortsControlCenter) dan menjalankan peran berikut:
+Repositori ini telah dimigrasikan dari `~/Documents/MacPorts_Docs` ke [`/Users/adijaya/MyFiles/Projects/macports-control-center`](file:///Users/adijaya/MyFiles/Projects/macports-control-center) dan menjalankan peran berikut:
 1. **Aplikasi GUI Desktop Native (`MacPorts Control Center.app`):** Aplikasi pembantu GUI berbasis **Swift Native (`SwiftUI` + `AppKit`)** untuk mempermudah pengelolaan layanan MacPorts, Nginx Virtual Hosts, Multi-PHP FPM & ekstensi, MariaDB, paket umum MacPorts, server logs, dan dokumentasi tanpa bergantung pada PHP.
-   - **Dokumen Desain (Spec):** [`docs/superpowers/specs/2026-10-27-macports-control-center-design.md`](file:///Users/adijaya/MyFiles/Projects/MacPortsControlCenter/docs/superpowers/specs/2026-10-27-macports-control-center-design.md)
-   - **Rencana Implementasi (Plan):** [`docs/superpowers/plans/2026-10-27-macports-control-center.md`](file:///Users/adijaya/MyFiles/Projects/MacPortsControlCenter/docs/superpowers/plans/2026-10-27-macports-control-center.md)
-2. **Configuration & Knowledge Base Source of Truth:** Dokumentasi teknis (`*.md`), template konfigurasi referensi ([`config_templates/`](file:///Users/adijaya/MyFiles/Projects/MacPortsControlCenter/config_templates)), dan skrip pemulihan/otomasi ([`scripts/`](file:///Users/adijaya/MyFiles/Projects/MacPortsControlCenter/scripts)) untuk seluruh stack web dev host (Laravel, PHP, Nginx, MariaDB).
-3. **Remote Sinkron:** GitHub publik [**adi-jaya/MacPortsControlCenter**](https://github.com/adi-jaya/MacPortsControlCenter) pada branch `main`.
+   - **Dokumen Desain (Spec):** [`docs/superpowers/specs/2026-10-27-macports-control-center-design.md`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/docs/superpowers/specs/2026-10-27-macports-control-center-design.md)
+   - **Rencana Implementasi (Plan):** [`docs/superpowers/plans/2026-10-27-macports-control-center.md`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/docs/superpowers/plans/2026-10-27-macports-control-center.md)
+2. **Configuration & Knowledge Base Source of Truth:** Dokumentasi teknis (`*.md`), template konfigurasi referensi ([`config_templates/`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/config_templates)), dan skrip pemulihan/otomasi ([`scripts/`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/scripts)) untuk seluruh stack web dev host (Laravel, PHP, Nginx, MariaDB).
+3. **Remote Sinkron:** GitHub publik [**adi-jaya/macports-control-center**](https://github.com/adi-jaya/macports-control-center) pada branch `main`.
 
 ---
 
