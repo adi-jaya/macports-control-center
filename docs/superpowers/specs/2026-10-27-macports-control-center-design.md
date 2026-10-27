@@ -3,7 +3,8 @@
 - **Tanggal:** 27 Oktober 2026
 - **Target Platform:** macOS Monterey 12.0+ (`x86_64` Intel & `arm64` Apple Silicon)
 - **Teknologi Utama:** Swift Native (`SwiftUI` + `AppKit`, Swift 5.7+)
-- **Repositori Induk:** `/Users/adijaya/Documents/MacPorts_Docs` (`adi-jaya/macports-webdev-setup`)
+- **Direktori Proyek Aplikasi:** `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter`
+- **Repositori Dokumentasi Acuan:** `/Users/adijaya/Documents/MacPorts_Docs` (`adi-jaya/macports-webdev-setup`)
 
 ---
 
@@ -80,41 +81,40 @@ Sebelum menetapkan desain akhir, empat pendekatan arsitektur telah dievaluasi:
 ## 5. Spesifikasi Arsitektur & Komponen Aplikasi
 
 ### A. Tata Letak Direktori Proyek
-Aplikasi ditempatkan di dalam repositori ini pada subdirektori `app/` agar mudah dikelola bersama dokumentasi dan skrip:
+Aplikasi ditempatkan sebagai proyek mandiri pada `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter` (mengikuti konvensi penamaan folder PascalCase di `/Users/adijaya/MyFiles/Projects/`):
 
 ```text
-/Users/adijaya/Documents/MacPorts_Docs/
-├── app/
-│   ├── Package.swift                 # Definisi Swift Package (target macOS 12.0+)
-│   ├── build-app.sh                  # Skrip kompilasi & pembuat bundel "MacPorts Control Center.app"
-│   ├── Resources/
-│   │   └── Info.plist                # Metadata bundel macOS (LSMinimumSystemVersion 12.0)
-│   └── Sources/
-│       └── MacPortsControlCenter/
-│           ├── MainApp.swift         # Entry point (@main), WindowGroup, MenuBarExtra (NSStatusItem), Cmd+K
-│           ├── Models/
-│           │   ├── AppState.swift    # State terpusat (@MainActor ObservableObject)
-│           │   ├── ServiceModels.swift
-│           │   ├── VHostModels.swift
-│           │   ├── PHPModels.swift
-│           │   └── PackageModels.swift
-│           ├── Services/
-│           │   ├── CommandRunner.swift   # Async Process streaming stdout/stderr + Serialized Port Queue
-│           │   ├── MacPortsService.swift # Parser port search, port installed, port select, LaunchDaemons
-│           │   ├──ConfigFileService.swift# Parser & writer nginx/*.conf, php.ini, www.conf, my.cnf, .env
-│           │   ├── DatabaseService.swift # Eksekusi mysql CLI / mysqldump via /tmp/mysql.sock
-│           │   └── DoctorService.swift   # Pemeriksaan & perbaikan otomatis guardrails AGENTS.md
-│           └── Views/
-│               ├── MainWindowView.swift  # Sidebar 7 menu + Area Konten + Docked Terminal Drawer
-│               ├── ServicesView.swift    # Halaman 1: Services & Ecosystem Tools
-│               ├── SitesView.swift       # Halaman 2: Nginx Virtual Hosts + .env detector
-│               ├── PHPManagerView.swift  # Halaman 3: Multi-PHP, Extensions Checkbox, Quick Tuning php.ini
-│               ├── DatabaseView.swift    # Halaman 4: MariaDB/MySQL, 24 DBs, Backup/Import .sql
-│               ├── PackagesView.swift    # Halaman 5: Universal port search, installed, port select
-│               ├── LogsView.swift        # Halaman 6: Live Log Tailer (Nginx, PHP-FPM, MariaDB)
-│               ├── DocsView.swift        # Halaman 7: Native Markdown Reader untuk MacPorts_Docs/*.md
-│               ├── TerminalDrawerView.swift # Panel bawah: Live stdout/stderr + tombol Cancel/Clear
-│               └── CommandPaletteView.swift # Overlay Cmd + K
+/Users/adijaya/MyFiles/Projects/MacPortsControlCenter/
+├── Package.swift                 # Definisi Swift Package (target macOS 12.0+)
+├── build-app.sh                  # Skrip kompilasi & pembuat bundel "MacPorts Control Center.app"
+├── Resources/
+│   └── Info.plist                # Metadata bundel macOS (LSMinimumSystemVersion 12.0)
+└── Sources/
+    └── MacPortsControlCenter/
+        ├── MainApp.swift         # Entry point (@main), WindowGroup, MenuBarExtra (NSStatusItem), Cmd+K
+        ├── Models/
+        │   ├── AppState.swift    # State terpusat (@MainActor ObservableObject)
+        │   ├── ServiceModels.swift
+        │   ├── VHostModels.swift
+        │   ├── PHPModels.swift
+        │   └── PackageModels.swift
+        ├── Services/
+        │   ├── CommandRunner.swift   # Async Process streaming stdout/stderr + Serialized Port Queue
+        │   ├── MacPortsService.swift # Parser port search, port installed, port select, LaunchDaemons
+        │   ├── ConfigFileService.swift # Parser & writer nginx/*.conf, php.ini, www.conf, my.cnf, .env
+        │   ├── DatabaseService.swift # Eksekusi mysql CLI / mysqldump via /tmp/mysql.sock
+        │   └── DoctorService.swift   # Pemeriksaan & perbaikan otomatis guardrails AGENTS.md
+        └── Views/
+            ├── MainWindowView.swift  # Sidebar 7 menu + Area Konten + Docked Terminal Drawer
+            ├── ServicesView.swift    # Halaman 1: Services & Ecosystem Tools
+            ├── SitesView.swift       # Halaman 2: Nginx Virtual Hosts + .env detector
+            ├── PHPManagerView.swift  # Halaman 3: Multi-PHP, Extensions Checkbox, Quick Tuning php.ini
+            ├── DatabaseView.swift    # Halaman 4: MariaDB/MySQL, 24 DBs, Backup/Import .sql
+            ├── PackagesView.swift    # Halaman 5: Universal port search, installed, port select
+            ├── LogsView.swift        # Halaman 6: Live Log Tailer (Nginx, PHP-FPM, MariaDB)
+            ├── DocsView.swift        # Halaman 7: Native Markdown Reader untuk MacPorts_Docs/*.md
+            ├── TerminalDrawerView.swift # Panel bawah: Live stdout/stderr + tombol Cancel/Clear
+            └── CommandPaletteView.swift # Overlay Cmd + K
 ```
 
 ### B. Mesin Eksekusi Perintah & *Docked Live Terminal Output Drawer* (`CommandRunner.swift`)
@@ -192,6 +192,6 @@ Aplikasi ditempatkan di dalam repositori ini pada subdirektori `app/` agar mudah
 ## 6. Keputusan Builder (*What's Left to the Builder*)
 
 Hal-hal detail implementasi berikut diserahkan kepada *builder*:
-1. **Kompilasi & Pembungkusan `.app`:** Menyusun `app/Package.swift` dan skrip `app/build-app.sh` yang mengompilasi binary Swift (`swift build -c release`) lalu membungkusnya ke `app/build/MacPorts Control Center.app` (dan menyalin symlink/aplikasi ke `/Applications` atau folder proyek jika diinginkan).
+1. **Kompilasi & Pembungkusan `.app`:** Menyusun `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter/Package.swift` dan skrip `build-app.sh` yang mengompilasi binary Swift (`swift build -c release`) lalu membungkusnya ke `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter/build/MacPorts Control Center.app` (serta opsional memasang ke `/Applications`).
 2. **Integrasi Dokumentasi Repositori:** Memperbarui [`README.md`](file:///Users/adijaya/Documents/MacPorts_Docs/README.md) dan [`AGENTS.md`](file:///Users/adijaya/Documents/MacPorts_Docs/AGENTS.md) setelah aplikasi selesai dibangun untuk mencatat cara menjalankan dan mengompilasi aplikasi GUI ini.
 3. **Parser Markdown Ringan Native:** Menggunakan parser Markdown berbasis Swift/`NSAttributedString` untuk halaman **MacPorts Docs** agar tabel, blok kode, dan *heading* tampil rapi di komponen native `NSTextView` tanpa membutuhkan `WKWebView`.
