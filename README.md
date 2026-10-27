@@ -1,8 +1,8 @@
 # 📚 Pusat Dokumentasi Lingkungan Web Development (MacPorts)
 
-[![GitHub Repository](https://img.shields.io/badge/GitHub-adi--jaya%2Fmacports--webdev--setup-181717?style=flat&logo=github)](https://github.com/adi-jaya/macports-webdev-setup)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-adi--jaya%2FMacPortsControlCenter-181717?style=flat&logo=github)](https://github.com/adi-jaya/MacPortsControlCenter)
 
-Selamat datang di direktori dokumentasi terpusat untuk lingkungan web development native berbasis **MacPorts** pada **macOS Monterey 12.7.6 (Intel x86_64)**. Repositori publik ini tersinkronisasi di [**github.com/adi-jaya/macports-webdev-setup**](https://github.com/adi-jaya/macports-webdev-setup).
+Selamat datang di repositori **MacPorts Control Center** dan pusat dokumentasi lingkungan web development native berbasis **MacPorts** pada **macOS Monterey 12.7.6 (Intel x86_64)**. Repositori publik ini tersinkronisasi di [**github.com/adi-jaya/MacPortsControlCenter**](https://github.com/adi-jaya/MacPortsControlCenter).
 
 Folder ini menyimpan seluruh panduan, catatan riwayat migrasi, konfigurasi sistem, dan template virtual host agar mudah dirujuk kembali kapan saja.
 

@@ -11,7 +11,7 @@ Repositori ini telah dimigrasikan dari `~/Documents/MacPorts_Docs` ke [`/Users/a
    - **Dokumen Desain (Spec):** [`docs/superpowers/specs/2026-10-27-macports-control-center-design.md`](file:///Users/adijaya/MyFiles/Projects/MacPortsControlCenter/docs/superpowers/specs/2026-10-27-macports-control-center-design.md)
    - **Rencana Implementasi (Plan):** [`docs/superpowers/plans/2026-10-27-macports-control-center.md`](file:///Users/adijaya/MyFiles/Projects/MacPortsControlCenter/docs/superpowers/plans/2026-10-27-macports-control-center.md)
 2. **Configuration & Knowledge Base Source of Truth:** Dokumentasi teknis (`*.md`), template konfigurasi referensi ([`config_templates/`](file:///Users/adijaya/MyFiles/Projects/MacPortsControlCenter/config_templates)), dan skrip pemulihan/otomasi ([`scripts/`](file:///Users/adijaya/MyFiles/Projects/MacPortsControlCenter/scripts)) untuk seluruh stack web dev host (Laravel, PHP, Nginx, MariaDB).
-3. **Remote Sinkron:** GitHub publik [**adi-jaya/macports-webdev-setup**](https://github.com/adi-jaya/macports-webdev-setup) pada branch `main`.
+3. **Remote Sinkron:** GitHub publik [**adi-jaya/MacPortsControlCenter**](https://github.com/adi-jaya/MacPortsControlCenter) pada branch `main`.
 
 ---
 

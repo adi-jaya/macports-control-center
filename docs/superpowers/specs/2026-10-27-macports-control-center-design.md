@@ -4,7 +4,7 @@
 - **Target Platform:** macOS Monterey 12.0+ (`x86_64` Intel & `arm64` Apple Silicon)
 - **Teknologi Utama:** Swift Native (`SwiftUI` + `AppKit`, Swift 5.7+)
 - **Direktori Proyek Aplikasi:** `/Users/adijaya/MyFiles/Projects/MacPortsControlCenter`
-- **Repositori Dokumentasi Acuan:** `/Users/adijaya/Documents/MacPorts_Docs` (`adi-jaya/macports-webdev-setup`)
+- **Repositori GitHub:** `adi-jaya/MacPortsControlCenter` (`https://github.com/adi-jaya/MacPortsControlCenter`)
 
 ---
 
