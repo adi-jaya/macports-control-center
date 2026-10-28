@@ -36,6 +36,10 @@ struct TestRunnerMain {
         cmdTests.tearDown()
 
         cmdTests.setUp()
+        await cmdTests.testStreamsMultiByteUTF8AcrossChunkBoundaries()
+        cmdTests.tearDown()
+
+        cmdTests.setUp()
         await cmdTests.testSerializedQueueRunsCommandsSequentially()
         cmdTests.tearDown()
 
@@ -43,7 +47,15 @@ struct TestRunnerMain {
         await cmdTests.testCancelCurrentProcessTerminatesLongRunningTask()
         cmdTests.tearDown()
 
-        print("All CommandRunnerTests passed successfully (3/3 tests)")
+        cmdTests.setUp()
+        await cmdTests.testConcurrentNonSerializedMaintainsIsRunningUntilAllFinish()
+        cmdTests.tearDown()
+
+        cmdTests.setUp()
+        await cmdTests.testCancelTerminatesAllActiveConcurrentProcesses()
+        cmdTests.tearDown()
+
+        print("All CommandRunnerTests passed successfully (6/6 tests)")
     }
 }
 #endif

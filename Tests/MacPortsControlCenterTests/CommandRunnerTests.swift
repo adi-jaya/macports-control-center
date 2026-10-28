@@ -15,6 +15,16 @@ final class CommandRunnerTests: XCTestCase {
         XCTAssertTrue(runner.terminalLines.contains(where: { $0.contains("line2") }))
     }
 
+    func testStreamsMultiByteUTF8AcrossChunkBoundaries() async {
+        let runner = CommandRunner()
+        let result = await runner.runShell("printf '🚀 rocket\\n✨ sparkles\\n'", label: "utf8-test", serialized: false)
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(result.stdout.contains("🚀 rocket"))
+        XCTAssertTrue(result.stdout.contains("✨ sparkles"))
+        XCTAssertTrue(runner.terminalLines.contains(where: { $0.contains("🚀 rocket") }))
+        XCTAssertTrue(runner.terminalLines.contains(where: { $0.contains("✨ sparkles") }))
+    }
+
     func testSerializedQueueRunsCommandsSequentially() async {
         let runner = CommandRunner()
         var order: [String] = []
@@ -41,5 +51,33 @@ final class CommandRunnerTests: XCTestCase {
         runner.cancelCurrentProcess()
         let res = await task.value
         XCTAssertNotEqual(res.exitCode, 0)
+    }
+
+    func testConcurrentNonSerializedMaintainsIsRunningUntilAllFinish() async {
+        let runner = CommandRunner()
+        async let shortTask = runner.runShell("sleep 0.05", label: "short", serialized: false)
+        async let longTask = runner.runShell("sleep 0.15", label: "long", serialized: false)
+
+        _ = await shortTask
+        XCTAssertTrue(runner.isRunning, "isRunning must remain true while longTask is still executing")
+        XCTAssertEqual(runner.currentCommandLabel, "long")
+
+        _ = await longTask
+        XCTAssertFalse(runner.isRunning, "isRunning must become false after all tasks finish")
+        XCTAssertEqual(runner.currentCommandLabel, "")
+    }
+
+    func testCancelTerminatesAllActiveConcurrentProcesses() async {
+        let runner = CommandRunner()
+        let taskA = Task { await runner.runShell("sleep 10", label: "cancelA", serialized: false) }
+        let taskB = Task { await runner.runShell("sleep 10", label: "cancelB", serialized: false) }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        runner.cancelCurrentProcess()
+        let resA = await taskA.value
+        let resB = await taskB.value
+        XCTAssertNotEqual(resA.exitCode, 0)
+        XCTAssertNotEqual(resB.exitCode, 0)
+        XCTAssertFalse(runner.isRunning)
     }
 }

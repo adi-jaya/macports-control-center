@@ -3,56 +3,62 @@ import Foundation
 // MARK: - Stream Collector
 final class StreamCollector: @unchecked Sendable {
     private let lock = NSLock()
-    private var output = ""
-    private var remainder = ""
+    private var allBytes = Data()
+    private var byteBuffer = Data()
 
     func appendData(_ data: Data) -> [String] {
-        guard let text = String(data: data, encoding: .utf8), !text.isEmpty else { return [] }
+        guard !data.isEmpty else { return [] }
         lock.lock()
         defer { lock.unlock() }
-        output += text
-        let combined = remainder + text
-        let parts = combined.components(separatedBy: "\n")
-        if parts.count > 1 {
-            var lines: [String] = []
-            for i in 0..<(parts.count - 1) {
-                var l = parts[i]
-                if l.hasSuffix("\r") { l.removeLast() }
-                lines.append(l)
+
+        allBytes.append(data)
+        byteBuffer.append(data)
+
+        var lines: [String] = []
+        let newlineByte = UInt8(ascii: "\n")
+        let crByte = UInt8(ascii: "\r")
+
+        while let newlineIndex = byteBuffer.firstIndex(of: newlineByte) {
+            var lineData = byteBuffer[..<newlineIndex]
+            if let lastByte = lineData.last, lastByte == crByte {
+                lineData = lineData.dropLast()
             }
-            remainder = parts.last ?? ""
-            return lines
-        } else {
-            remainder = combined
-            return []
+            lines.append(String(decoding: lineData, as: UTF8.self))
+            byteBuffer = Data(byteBuffer[(newlineIndex + 1)...])
         }
+
+        return lines
     }
 
     func finish(remainingData: Data?) -> (output: String, finalLines: [String]) {
         lock.lock()
         defer { lock.unlock() }
-        if let data = remainingData, let text = String(data: data, encoding: .utf8), !text.isEmpty {
-            output += text
-            remainder += text
+
+        if let data = remainingData, !data.isEmpty {
+            allBytes.append(data)
+            byteBuffer.append(data)
         }
+
         var lines: [String] = []
-        if !remainder.isEmpty {
-            let parts = remainder.components(separatedBy: "\n")
-            for part in parts {
-                var l = part
-                if l.hasSuffix("\r") { l.removeLast() }
-                if !l.isEmpty {
-                    lines.append(l)
-                }
+        if !byteBuffer.isEmpty {
+            var remaining = byteBuffer
+            if let lastByte = remaining.last, lastByte == UInt8(ascii: "\r") {
+                remaining = remaining.dropLast()
             }
-            remainder = ""
+            let str = String(decoding: remaining, as: UTF8.self)
+            if !str.isEmpty {
+                lines.append(str)
+            }
+            byteBuffer = Data()
         }
+
+        let output = String(decoding: allBytes, as: UTF8.self)
         return (output, lines)
     }
 }
 
 // MARK: - Command Result
-public struct CommandResult: Equatable {
+public struct CommandResult: Equatable, Sendable {
     public let exitCode: Int32
     public let stdout: String
     public let stderr: String
@@ -71,8 +77,9 @@ public final class CommandRunner: ObservableObject {
     @Published public private(set) var isRunning: Bool = false
     @Published public private(set) var currentCommandLabel: String = ""
 
-    private var currentProcess: Process?
+    private var activeProcesses: [UUID: (process: Process, label: String)] = [:]
     private var queueTail: Task<Void, Never>? = nil
+    private let maxTerminalLines = 5000
 
     public init() {}
 
@@ -81,8 +88,10 @@ public final class CommandRunner: ObservableObject {
     }
 
     public func cancelCurrentProcess() {
-        if let proc = currentProcess, proc.isRunning {
-            proc.terminate()
+        for (_, entry) in activeProcesses {
+            if entry.process.isRunning {
+                entry.process.terminate()
+            }
         }
     }
 
@@ -121,6 +130,9 @@ public final class CommandRunner: ObservableObject {
 
     private func appendLine(_ line: String, onLine: ((String) -> Void)?) {
         terminalLines.append(line)
+        if terminalLines.count > maxTerminalLines {
+            terminalLines.removeFirst(terminalLines.count - maxTerminalLines)
+        }
         onLine?(line)
     }
 
@@ -130,12 +142,24 @@ public final class CommandRunner: ObservableObject {
         label: String,
         onLine: ((String) -> Void)?
     ) async -> CommandResult {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+
+        let runID = UUID()
+        activeProcesses[runID] = (process, label)
         isRunning = true
         currentCommandLabel = label
+
         defer {
-            isRunning = false
-            currentCommandLabel = ""
-            currentProcess = nil
+            activeProcesses.removeValue(forKey: runID)
+            if let remaining = activeProcesses.values.first {
+                currentCommandLabel = remaining.label
+                isRunning = true
+            } else {
+                currentCommandLabel = ""
+                isRunning = false
+            }
         }
 
         let cmdDisplay: String
@@ -146,10 +170,6 @@ public final class CommandRunner: ObservableObject {
             cmdDisplay = argsStr.isEmpty ? "$ \(executable)" : "$ \(executable) \(argsStr)"
         }
         appendLine(cmdDisplay, onLine: onLine)
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
 
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = "/opt/local/bin:/opt/local/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:\(NSHomeDirectory())/.local/bin"
@@ -197,8 +217,6 @@ public final class CommandRunner: ObservableObject {
                 }
             }
         }
-
-        currentProcess = process
 
         do {
             try process.run()
