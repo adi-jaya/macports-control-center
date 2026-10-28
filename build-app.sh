@@ -26,8 +26,9 @@ mkdir -p "${RESOURCES_DIR}"
 
 # 2. Compile native release executable
 echo "[1/4] Compiling Swift Native release binary with swiftc..."
+SDK_PATH="$(xcrun --show-sdk-path 2>/dev/null || echo "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk")"
 swiftc -O -target x86_64-apple-macos12.0 \
-    -sdk /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk \
+    -sdk "${SDK_PATH}" \
     -whole-module-optimization \
     -parse-as-library \
     "${REPO_DIR}"/Sources/MacPortsControlCenter/Models/*.swift \
