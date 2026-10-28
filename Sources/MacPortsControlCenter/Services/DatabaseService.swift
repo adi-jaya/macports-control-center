@@ -37,14 +37,15 @@ public struct DatabaseService {
     /// Builds command to list all databases via socket
     public static func buildShowDatabasesCommand(socketPath: String = defaultSocketPath) -> String {
         let safeSocket = quoteArg(socketPath)
-        return "\(mysqlBinary) -u root --socket=\(safeSocket) -e 'SHOW DATABASES;'"
+        return "\(mysqlBinary) -u root --socket=\(safeSocket) -e \(quoteArg("SHOW DATABASES;"))"
     }
 
     /// Builds command to create a new database safely
     public static func buildCreateDatabaseCommand(dbName: String, socketPath: String = defaultSocketPath) -> String {
         let safeSocket = quoteArg(socketPath)
-        let sanitizedDbName = dbName.replacingOccurrences(of: "`", with: "``").replacingOccurrences(of: "'", with: "\\'")
-        return "\(mysqlBinary) -u root --socket=\(safeSocket) -e 'CREATE DATABASE IF NOT EXISTS `\(sanitizedDbName)`;'"
+        let sanitizedDbName = dbName.replacingOccurrences(of: "`", with: "``")
+        let escapedSql = "CREATE DATABASE IF NOT EXISTS `\(sanitizedDbName)`;"
+        return "\(mysqlBinary) -u root --socket=\(safeSocket) -e \(quoteArg(escapedSql))"
     }
 
     /// Builds command to dump / export database to .sql file
@@ -66,7 +67,8 @@ public struct DatabaseService {
     /// Builds command to drop a database safely
     public static func buildDropDatabaseCommand(dbName: String, socketPath: String = defaultSocketPath) -> String {
         let safeSocket = quoteArg(socketPath)
-        let sanitizedDbName = dbName.replacingOccurrences(of: "`", with: "``").replacingOccurrences(of: "'", with: "\\'")
-        return "\(mysqlBinary) -u root --socket=\(safeSocket) -e 'DROP DATABASE IF EXISTS `\(sanitizedDbName)`;'"
+        let sanitizedDbName = dbName.replacingOccurrences(of: "`", with: "``")
+        let escapedSql = "DROP DATABASE IF EXISTS `\(sanitizedDbName)`;"
+        return "\(mysqlBinary) -u root --socket=\(safeSocket) -e \(quoteArg(escapedSql))"
     }
 }

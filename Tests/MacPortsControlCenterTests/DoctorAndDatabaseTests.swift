@@ -118,6 +118,21 @@ final class DoctorAndDatabaseTests: XCTestCase {
         let fixWithSlash = DoctorService.buildFixStoragePermissionsCommand(projectRootPath: "/var/www/site/")
         XCTAssertTrue(fixWithSlash.contains("'/var/www/site/storage'"))
         XCTAssertFalse(fixWithSlash.contains("//storage"))
+
+        // Guard against empty string and root "/"
+        XCTAssertEqual(DoctorService.buildFixStoragePermissionsCommand(projectRootPath: ""), "")
+        XCTAssertEqual(DoctorService.buildFixStoragePermissionsCommand(projectRootPath: "   "), "")
+        XCTAssertEqual(DoctorService.buildFixStoragePermissionsCommand(projectRootPath: "/"), "")
+        XCTAssertEqual(DoctorService.buildFixStoragePermissionsCommand(projectRootPath: "///"), "")
+
+        // Validation for currentUser in buildPrivilegedAutoFixScript
+        let invalidUserScript = DoctorService.buildPrivilegedAutoFixScript(currentUser: "evil;rm -rf /")
+        XCTAssertFalse(invalidUserScript.contains("evil;rm -rf /"))
+        XCTAssertTrue(invalidUserScript.contains("ALL=(ALL) NOPASSWD: /opt/local/bin/port"))
+
+        let emptyUserScript = DoctorService.buildPrivilegedAutoFixScript(currentUser: "")
+        XCTAssertFalse(emptyUserScript.contains("  ALL=(ALL)"))
+        XCTAssertTrue(emptyUserScript.contains("ALL=(ALL) NOPASSWD: /opt/local/bin/port"))
     }
 
     func testDatabaseServiceSpecialCharactersAndEmptyOutputs() {
@@ -133,12 +148,16 @@ final class DoctorAndDatabaseTests: XCTestCase {
         """)
         XCTAssertEqual(onlySystem, [])
 
-        // Special characters in DB name & socket path
+        // Special characters in DB name & socket path - quotes SQL string cleanly with quoteArg
         let create = DatabaseService.buildCreateDatabaseCommand(dbName: "my`db'name", socketPath: "/custom'path/mysql.sock")
-        XCTAssertTrue(create.contains("`my``db\\'name`"))
+        XCTAssertTrue(create.contains("`my``db'\\''name`"))
         XCTAssertTrue(create.contains("--socket='/custom'\\''path/mysql.sock'"))
+        XCTAssertTrue(create.contains("-e 'CREATE DATABASE IF NOT EXISTS `my``db'\\''name`;'"))
 
-        let drop = DatabaseService.buildDropDatabaseCommand(dbName: "test_db", socketPath: "/tmp/mysql.sock")
-        XCTAssertTrue(drop.contains("DROP DATABASE IF EXISTS `test_db`"))
+        let drop = DatabaseService.buildDropDatabaseCommand(dbName: "my`db'name", socketPath: "/tmp/mysql.sock")
+        XCTAssertTrue(drop.contains("-e 'DROP DATABASE IF EXISTS `my``db'\\''name`;'"))
+
+        let show = DatabaseService.buildShowDatabasesCommand(socketPath: "/tmp/mysql.sock")
+        XCTAssertTrue(show.contains("-e 'SHOW DATABASES;'"))
     }
 }

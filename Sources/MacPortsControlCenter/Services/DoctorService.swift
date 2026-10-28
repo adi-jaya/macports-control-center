@@ -80,19 +80,29 @@ public struct DoctorService {
         return items
     }
 
-    /// Builds command to fix Laravel storage and bootstrap/cache permissions without sudo
+    /// Builds command to fix Laravel storage and bootstrap/cache permissions without sudo.
+    /// Guards against empty string or root "/" to prevent dangerous operations on system root.
     public static func buildFixStoragePermissionsCommand(projectRootPath: String) -> String {
-        let cleanPath = projectRootPath.hasSuffix("/") ? String(projectRootPath.dropLast()) : projectRootPath
+        let trimmed = projectRootPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        var cleanPath = trimmed
+        while cleanPath.hasSuffix("/") && cleanPath.count > 1 {
+            cleanPath.removeLast()
+        }
+        guard !cleanPath.isEmpty && cleanPath != "/" else {
+            return ""
+        }
         let safePath = cleanPath.replacingOccurrences(of: "'", with: "'\\''")
         return "chmod -R u+rwX '\(safePath)/storage' '\(safePath)/bootstrap/cache'"
     }
 
-    /// Builds the root-level shell script executed via osascript with administrator privileges
+    /// Builds the root-level shell script executed via osascript with administrator privileges.
+    /// Validates `currentUser` against `^[a-zA-Z0-9_.-]+$` to prevent sudoers corruption or injection.
     public static func buildPrivilegedAutoFixScript(currentUser: String) -> String {
-        let safeUser = currentUser
-            .replacingOccurrences(of: "'", with: "")
-            .replacingOccurrences(of: "\"", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedUser = currentUser.trimmingCharacters(in: .whitespacesAndNewlines)
+        let usernameRegex = "^[a-zA-Z0-9_.-]+$"
+        let isValid = !trimmedUser.isEmpty && trimmedUser.range(of: usernameRegex, options: .regularExpression) != nil
+        let targetUser = isValid ? trimmedUser : NSUserName()
+        let safeUser = (!targetUser.isEmpty && targetUser.range(of: usernameRegex, options: .regularExpression) != nil) ? targetUser : "admin"
 
         return """
         #!/bin/bash
