@@ -1,3 +1,4 @@
+#if !canImport(XCTest)
 import Foundation
 
 @main
@@ -28,3 +29,4 @@ struct TestRunnerMain {
         print("All MacPortsServiceTests passed successfully (5/5 tests)")
     }
 }
+#endif

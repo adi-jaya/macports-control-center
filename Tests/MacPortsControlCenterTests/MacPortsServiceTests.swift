@@ -61,6 +61,7 @@ final class MacPortsServiceTests: XCTestCase {
           curl @8.23.0_0+ssl (active)
           curl @8.21.0_0+ssl
           php85 @8.5.12_0
+        None of the specified ports are installed.
         """
         let installed = MacPortsService.parseInstalledPorts(installedSample)
         XCTAssertEqual(installed.count, 4)

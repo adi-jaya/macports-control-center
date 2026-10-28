@@ -44,7 +44,7 @@ public struct MacPortsService {
                 continue
             }
             let parts = trimmed.split(whereSeparator: { $0.isWhitespace }).map(String.init)
-            guard parts.count >= 2 else { continue }
+            guard parts.count >= 2, parts[1].hasPrefix("@") else { continue }
             let name = parts[0]
             let version = parts[1]
             let isActive = trimmed.contains("(active)")
