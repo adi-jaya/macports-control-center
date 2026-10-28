@@ -3,6 +3,133 @@ import AppKit
 
 // MARK: - MarkdownStyler
 public struct MarkdownStyler {
+    private struct AlertType {
+        let tag: String
+        let icon: String
+        let title: String
+        let color: NSColor
+    }
+
+    private static let alertTypes: [AlertType] = [
+        AlertType(tag: "[!note]", icon: "📘", title: "NOTE", color: NSColor.systemBlue),
+        AlertType(tag: "[!tip]", icon: "💡", title: "TIP", color: NSColor.systemGreen),
+        AlertType(tag: "[!important]", icon: "⚠️", title: "IMPORTANT", color: NSColor.systemOrange),
+        AlertType(tag: "[!warning]", icon: "🛑", title: "WARNING", color: NSColor.systemRed),
+        AlertType(tag: "[!caution]", icon: "🔥", title: "CAUTION", color: NSColor.systemRed)
+    ]
+
+    private static func decodeHTMLEntities(_ raw: String) -> String {
+        var text = raw
+        let entities = [
+            ("&rarr;", "→"),
+            ("&larr;", "←"),
+            ("&mdash;", "—"),
+            ("&ndash;", "–"),
+            ("&hellip;", "…"),
+            ("&copy;", "©"),
+            ("&times;", "×")
+        ]
+        for (ent, rep) in entities {
+            text = text.replacingOccurrences(of: ent, with: rep)
+        }
+        return text
+    }
+
+    private static func cleanCellText(_ raw: String) -> String {
+        var text = decodeHTMLEntities(raw)
+        text = text.replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: .regularExpression)
+        // Strip markdown links [label](url) -> label to avoid artificial URL column bloating
+        if let linkRegex = try? NSRegularExpression(pattern: "\\[([^\\]]+)\\]\\([^\\)]+\\)") {
+            text = linkRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "$1")
+        }
+        text = text.replacingOccurrences(of: "**", with: "")
+        return text.trimmingCharacters(in: .whitespaces)
+    }
+
+    private static func wrapText(_ text: String, width: Int) -> [String] {
+        let effectiveWidth = max(4, width)
+        let rawLines = text.components(separatedBy: "\n")
+        var result: [String] = []
+
+        for rawLine in rawLines {
+            let words = rawLine.components(separatedBy: " ")
+            var current = ""
+            for word in words {
+                if word.isEmpty { continue }
+                if current.isEmpty {
+                    if word.count <= effectiveWidth {
+                        current = word
+                    } else {
+                        var rem = word
+                        while rem.count > effectiveWidth {
+                            let chunk = String(rem.prefix(effectiveWidth))
+                            result.append(chunk)
+                            rem = String(rem.dropFirst(effectiveWidth))
+                        }
+                        current = rem
+                    }
+                } else if current.count + 1 + word.count <= effectiveWidth {
+                    current += " " + word
+                } else {
+                    result.append(current)
+                    if word.count <= effectiveWidth {
+                        current = word
+                    } else {
+                        var rem = word
+                        while rem.count > effectiveWidth {
+                            let chunk = String(rem.prefix(effectiveWidth))
+                            result.append(chunk)
+                            rem = String(rem.dropFirst(effectiveWidth))
+                        }
+                        current = rem
+                    }
+                }
+            }
+            if !current.isEmpty {
+                result.append(current)
+            }
+        }
+        return result.isEmpty ? [""] : result
+    }
+
+    private static func computeColumnWidths(rows: [[String]], numCols: Int, maxTableWidth: Int = 96) -> [Int] {
+        guard numCols > 0 else { return [] }
+        var minWordWidths = Array(repeating: 3, count: numCols)
+        var naturalWidths = Array(repeating: 3, count: numCols)
+
+        for row in rows {
+            for (i, cell) in row.enumerated() where i < numCols {
+                let words = cell.components(separatedBy: CharacterSet.whitespacesAndNewlines)
+                let maxWord = words.map { $0.count }.max() ?? 0
+                minWordWidths[i] = max(minWordWidths[i], min(maxWord, 24))
+                naturalWidths[i] = max(naturalWidths[i], cell.count)
+            }
+        }
+
+        var colWidths = naturalWidths
+        let totalBorders = 3 * numCols + 3
+        let availableWidth = max(40, maxTableWidth - totalBorders)
+        var currentTotal = colWidths.reduce(0, +)
+
+        while currentTotal > availableWidth {
+            var bestIdx: Int? = nil
+            var bestWidth = 0
+            for i in 0..<numCols {
+                if colWidths[i] > minWordWidths[i] && colWidths[i] > bestWidth {
+                    bestWidth = colWidths[i]
+                    bestIdx = i
+                }
+            }
+            guard let idx = bestIdx, bestWidth > 12 else {
+                break
+            }
+            colWidths[idx] -= 1
+            currentTotal -= 1
+        }
+
+        return colWidths
+    }
+
     public static func style(_ markdown: String) -> NSAttributedString {
         let result = NSMutableAttributedString()
         let lines = markdown.components(separatedBy: "\n")
@@ -17,7 +144,7 @@ public struct MarkdownStyler {
             for line in tableLines {
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
                 if trimmed.hasPrefix("|") && trimmed.hasSuffix("|") {
-                    let cells = trimmed.dropFirst().dropLast().components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }
+                    let cells = trimmed.dropFirst().dropLast().components(separatedBy: "|").map { cleanCellText($0) }
                     let isSep = cells.allSatisfy { cell in
                         cell.allSatisfy { $0 == "-" || $0 == ":" } && !cell.isEmpty
                     }
@@ -28,40 +155,45 @@ public struct MarkdownStyler {
             }
             if !rows.isEmpty {
                 let numCols = rows.map { $0.count }.max() ?? 0
-                var colWidths = Array(repeating: 0, count: numCols)
-                for row in rows {
-                    for (i, cell) in row.enumerated() {
-                        if i < numCols {
-                            colWidths[i] = max(colWidths[i], cell.count)
-                        }
-                    }
-                }
+                let colWidths = computeColumnWidths(rows: rows, numCols: numCols)
 
                 let tableAttr = NSMutableAttributedString()
                 let pStyle = NSMutableParagraphStyle()
-                pStyle.lineSpacing = 2
+                pStyle.lineSpacing = 1.5
                 pStyle.paragraphSpacing = 0
 
                 for (rowIndex, row) in rows.enumerated() {
-                    var lineStr = ""
+                    var cellLines: [[String]] = []
                     for (i, cell) in row.enumerated() {
-                        let w = colWidths[i]
-                        let padded = cell.padding(toLength: w, withPad: " ", startingAt: 0)
-                        lineStr += (i == 0 ? "  " : " │ ") + padded
+                        let w = i < colWidths.count ? colWidths[i] : 20
+                        cellLines.append(wrapText(cell, width: w))
                     }
-                    lineStr += "\n"
+                    while cellLines.count < numCols {
+                        cellLines.append([""])
+                    }
+                    let maxLines = cellLines.map { $0.count }.max() ?? 1
 
-                    let isHeader = (rowIndex == 0)
-                    let font = isHeader ? NSFont.monospacedSystemFont(ofSize: 11.5, weight: .bold) : NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
-                    let color = isHeader ? NSColor.controlAccentColor : NSColor.textColor
-                    let rowAttr = NSAttributedString(string: lineStr, attributes: [
-                        .font: font,
-                        .foregroundColor: color,
-                        .paragraphStyle: pStyle
-                    ])
-                    tableAttr.append(rowAttr)
+                    for lineIdx in 0..<maxLines {
+                        var lineStr = ""
+                        for i in 0..<numCols {
+                            let w = i < colWidths.count ? colWidths[i] : 20
+                            let cellLine = (i < cellLines.count && lineIdx < cellLines[i].count) ? cellLines[i][lineIdx] : ""
+                            let padded = cellLine.padding(toLength: w, withPad: " ", startingAt: 0)
+                            lineStr += (i == 0 ? "  " : " │ ") + padded
+                        }
+                        lineStr += "\n"
 
-                    if isHeader {
+                        let isHeader = (rowIndex == 0)
+                        let font = isHeader ? NSFont.monospacedSystemFont(ofSize: 11.5, weight: .bold) : NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
+                        let color = isHeader ? NSColor.controlAccentColor : NSColor.textColor
+                        tableAttr.append(NSAttributedString(string: lineStr, attributes: [
+                            .font: font,
+                            .foregroundColor: color,
+                            .paragraphStyle: pStyle
+                        ]))
+                    }
+
+                    if rowIndex == 0 {
                         var sepStr = "  "
                         for (i, w) in colWidths.enumerated() {
                             sepStr += (i == 0 ? "" : "─┼─") + String(repeating: "─", count: w)
@@ -104,6 +236,47 @@ public struct MarkdownStyler {
             inCodeBlock = false
         }
 
+        func appendInlineMarkdown(_ text: String, baseFont: NSFont = NSFont.systemFont(ofSize: 13), baseColor: NSColor = NSColor.textColor, style: NSParagraphStyle) {
+            let processedText = decodeHTMLEntities(text)
+            if let inlineAttr = try? AttributedString(markdown: processedText, options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+                let mutableInline = NSMutableAttributedString(inlineAttr)
+                let fullRange = NSRange(location: 0, length: mutableInline.length)
+                mutableInline.addAttribute(.paragraphStyle, value: style, range: fullRange)
+                mutableInline.addAttribute(.font, value: baseFont, range: fullRange)
+                mutableInline.addAttribute(.foregroundColor, value: baseColor, range: fullRange)
+
+                for run in inlineAttr.runs {
+                    let nsRange = NSRange(run.range, in: inlineAttr)
+                    if let inline = run.inlinePresentationIntent {
+                        if inline.contains(.code) {
+                            mutableInline.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular), range: nsRange)
+                            mutableInline.addAttribute(.foregroundColor, value: NSColor(calibratedRed: 0.22, green: 0.74, blue: 0.97, alpha: 1.0), range: nsRange)
+                            mutableInline.addAttribute(.backgroundColor, value: NSColor.black.withAlphaComponent(0.15), range: nsRange)
+                        } else if inline.contains(.stronglyEmphasized) {
+                            mutableInline.addAttribute(.font, value: NSFont.systemFont(ofSize: baseFont.pointSize, weight: .bold), range: nsRange)
+                        } else if inline.contains(.emphasized) {
+                            mutableInline.addAttribute(.font, value: NSFont.systemFont(ofSize: baseFont.pointSize, weight: .semibold), range: nsRange)
+                        }
+                    }
+                    if let url = run.link {
+                        mutableInline.addAttribute(.link, value: url, range: nsRange)
+                        mutableInline.addAttribute(.foregroundColor, value: NSColor.controlAccentColor, range: nsRange)
+                        mutableInline.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: nsRange)
+                    }
+                }
+                result.append(mutableInline)
+                result.append(NSAttributedString(string: "\n"))
+            } else {
+                result.append(NSAttributedString(string: processedText + "\n", attributes: [
+                    .font: baseFont,
+                    .foregroundColor: baseColor,
+                    .paragraphStyle: style
+                ]))
+            }
+        }
+
+        var activeAlert: AlertType? = nil
+
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
 
@@ -125,11 +298,78 @@ public struct MarkdownStyler {
 
             // Table detection
             if trimmed.hasPrefix("|") && trimmed.hasSuffix("|") {
+                activeAlert = nil
                 tableLines.append(line)
                 inTable = true
                 continue
             } else if inTable {
                 flushTable()
+            }
+
+            // Blockquote & GitHub Alerts
+            if trimmed.hasPrefix(">") {
+                let quoteContent = String(trimmed.dropFirst()).trimmingCharacters(in: .whitespaces)
+
+                // Check for GitHub alert tag
+                var matchedAlert: AlertType? = nil
+                var alertRest = ""
+                let lowerQuote = quoteContent.lowercased()
+                for alert in alertTypes {
+                    if lowerQuote.hasPrefix(alert.tag) {
+                        matchedAlert = alert
+                        alertRest = String(quoteContent.dropFirst(alert.tag.count)).trimmingCharacters(in: .whitespaces)
+                        break
+                    }
+                }
+
+                if let alert = matchedAlert {
+                    activeAlert = alert
+                    // Render alert header
+                    let headerStyle = NSMutableParagraphStyle()
+                    headerStyle.headIndent = 16
+                    headerStyle.firstLineHeadIndent = 16
+                    headerStyle.paragraphSpacingBefore = 8
+                    headerStyle.paragraphSpacing = 3
+
+                    let headerStr = "\(alert.icon) \(alert.title)\n"
+                    result.append(NSAttributedString(string: headerStr, attributes: [
+                        .font: NSFont.systemFont(ofSize: 12.5, weight: .bold),
+                        .foregroundColor: alert.color,
+                        .paragraphStyle: headerStyle
+                    ]))
+
+                    if !alertRest.isEmpty {
+                        let bodyStyle = NSMutableParagraphStyle()
+                        bodyStyle.headIndent = 20
+                        bodyStyle.firstLineHeadIndent = 20
+                        bodyStyle.lineSpacing = 3
+                        bodyStyle.paragraphSpacing = 6
+                        appendInlineMarkdown("┃ " + alertRest, baseFont: NSFont.systemFont(ofSize: 12.5), baseColor: NSColor.textColor, style: bodyStyle)
+                    }
+                    continue
+                }
+
+                // Continuation of active alert
+                if activeAlert != nil {
+                    let bodyStyle = NSMutableParagraphStyle()
+                    bodyStyle.headIndent = 20
+                    bodyStyle.firstLineHeadIndent = 20
+                    bodyStyle.lineSpacing = 3
+                    bodyStyle.paragraphSpacing = 6
+                    appendInlineMarkdown("┃ " + quoteContent, baseFont: NSFont.systemFont(ofSize: 12.5), baseColor: NSColor.textColor, style: bodyStyle)
+                    continue
+                }
+
+                // Regular blockquote
+                let quoteStyle = NSMutableParagraphStyle()
+                quoteStyle.headIndent = 16
+                quoteStyle.firstLineHeadIndent = 16
+                quoteStyle.lineSpacing = 3
+                quoteStyle.paragraphSpacing = 6
+                appendInlineMarkdown("┃ " + quoteContent, baseFont: NSFont.systemFont(ofSize: 12.5), baseColor: NSColor.secondaryLabelColor, style: quoteStyle)
+                continue
+            } else {
+                activeAlert = nil
             }
 
             // Headings
@@ -168,22 +408,6 @@ public struct MarkdownStyler {
                 continue
             }
 
-            // Blockquote
-            if trimmed.hasPrefix(">") {
-                let quoteText = String(trimmed.dropFirst()).trimmingCharacters(in: .whitespaces)
-                let quoteStyle = NSMutableParagraphStyle()
-                quoteStyle.headIndent = 16
-                quoteStyle.firstLineHeadIndent = 16
-                quoteStyle.lineSpacing = 3
-                quoteStyle.paragraphSpacing = 6
-                result.append(NSAttributedString(string: "┃ " + quoteText + "\n", attributes: [
-                    .font: NSFont.systemFont(ofSize: 12.5),
-                    .foregroundColor: NSColor.secondaryLabelColor,
-                    .paragraphStyle: quoteStyle
-                ]))
-                continue
-            }
-
             // Blank line
             if trimmed.isEmpty {
                 let blankStyle = NSMutableParagraphStyle()
@@ -195,56 +419,87 @@ public struct MarkdownStyler {
                 continue
             }
 
-            // Regular paragraph or list item with inline markdown formatting
+            // List item detection (ordered or unordered)
+            let leadingSpaces = line.prefix(while: { $0 == " " }).count
+            var listPrefix: String? = nil
+            var listContent: String = trimmed
+
+            if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("+ ") {
+                listPrefix = "• "
+                listContent = String(trimmed.dropFirst(2))
+            } else if let numMatch = try? NSRegularExpression(pattern: #"^(\d+\.)\s+(.*)$"#).firstMatch(in: trimmed, range: NSRange(location: 0, length: (trimmed as NSString).length)) {
+                let ns = trimmed as NSString
+                listPrefix = ns.substring(with: numMatch.range(at: 1)) + " "
+                listContent = ns.substring(with: numMatch.range(at: 2))
+            }
+
+            if let prefix = listPrefix {
+                let indentLevel = max(0, leadingSpaces / 2)
+                let baseIndent: CGFloat = 18.0 + CGFloat(indentLevel) * 16.0
+                let firstIndent: CGFloat = max(4.0, baseIndent - 12.0)
+
+                let listStyle = NSMutableParagraphStyle()
+                listStyle.headIndent = baseIndent
+                listStyle.firstLineHeadIndent = firstIndent
+                listStyle.lineSpacing = 3
+                listStyle.paragraphSpacing = 4
+
+                let fullItemText = prefix + listContent
+                appendInlineMarkdown(fullItemText, baseFont: NSFont.systemFont(ofSize: 13), baseColor: NSColor.textColor, style: listStyle)
+                continue
+            }
+
+            // Regular paragraph
             let paraStyle = NSMutableParagraphStyle()
             paraStyle.lineSpacing = 4
             paraStyle.paragraphSpacing = 6
-            if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
-                paraStyle.headIndent = 20
-                paraStyle.firstLineHeadIndent = 8
-            }
-
-            let lineToFormat = line
-            if let inlineAttr = try? AttributedString(markdown: lineToFormat, options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
-                let mutableInline = NSMutableAttributedString(inlineAttr)
-                let fullRange = NSRange(location: 0, length: mutableInline.length)
-                mutableInline.addAttribute(.paragraphStyle, value: paraStyle, range: fullRange)
-                mutableInline.addAttribute(.font, value: NSFont.systemFont(ofSize: 13), range: fullRange)
-                mutableInline.addAttribute(.foregroundColor, value: NSColor.textColor, range: fullRange)
-
-                for run in inlineAttr.runs {
-                    let nsRange = NSRange(run.range, in: inlineAttr)
-                    if let inline = run.inlinePresentationIntent {
-                        if inline.contains(.code) {
-                            mutableInline.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular), range: nsRange)
-                            mutableInline.addAttribute(.foregroundColor, value: NSColor(calibratedRed: 0.22, green: 0.74, blue: 0.97, alpha: 1.0), range: nsRange)
-                            mutableInline.addAttribute(.backgroundColor, value: NSColor.black.withAlphaComponent(0.15), range: nsRange)
-                        } else if inline.contains(.stronglyEmphasized) {
-                            mutableInline.addAttribute(.font, value: NSFont.systemFont(ofSize: 13, weight: .bold), range: nsRange)
-                        } else if inline.contains(.emphasized) {
-                            mutableInline.addAttribute(.font, value: NSFont.systemFont(ofSize: 13, weight: .semibold), range: nsRange)
-                        }
-                    }
-                    if let url = run.link {
-                        mutableInline.addAttribute(.link, value: url, range: nsRange)
-                        mutableInline.addAttribute(.foregroundColor, value: NSColor.controlAccentColor, range: nsRange)
-                        mutableInline.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: nsRange)
-                    }
-                }
-                result.append(mutableInline)
-                result.append(NSAttributedString(string: "\n"))
-            } else {
-                result.append(NSAttributedString(string: line + "\n", attributes: [
-                    .font: NSFont.systemFont(ofSize: 13),
-                    .foregroundColor: NSColor.textColor,
-                    .paragraphStyle: paraStyle
-                ]))
-            }
+            appendInlineMarkdown(line, baseFont: NSFont.systemFont(ofSize: 13), baseColor: NSColor.textColor, style: paraStyle)
         }
 
         flushTable()
         flushCodeBlock()
         return result
+    }
+}
+
+// MARK: - DocsScrollView
+public final class DocsScrollView: NSScrollView {
+    public override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupScrollers()
+    }
+
+    public required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupScrollers()
+    }
+
+    private func setupScrollers() {
+        drawsBackground = true
+        backgroundColor = NSColor.textBackgroundColor
+        hasVerticalScroller = true
+        hasHorizontalScroller = true
+        autohidesScrollers = true
+    }
+
+    public override func layout() {
+        super.layout()
+        guard let textView = documentView as? NSTextView,
+              let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer else { return }
+
+        let contentWidth = contentSize.width
+        guard contentWidth > 50 else { return }
+
+        let targetWidth = contentWidth - textView.textContainerInset.width * 2
+        if abs(textContainer.containerSize.width - targetWidth) > 1.0 {
+            textContainer.containerSize = NSSize(width: targetWidth, height: CGFloat.greatestFiniteMagnitude)
+            textView.frame.size.width = contentWidth
+            layoutManager.ensureLayout(for: textContainer)
+            let usedRect = layoutManager.usedRect(for: textContainer)
+            let calculatedHeight = max(usedRect.height + textView.textContainerInset.height * 2, contentSize.height)
+            textView.frame.size.height = calculatedHeight
+        }
     }
 }
 
@@ -259,18 +514,19 @@ public struct MarkdownTextViewRepresentable: NSViewRepresentable {
     public class Coordinator {
         var currentText: String = ""
         var cachedAttributedString: NSAttributedString?
+        var lastWidth: CGFloat = 0
     }
 
     public func makeCoordinator() -> Coordinator {
         Coordinator()
     }
 
-    public func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSScrollView()
+    public func makeNSView(context: Context) -> DocsScrollView {
+        let scrollView = DocsScrollView()
         scrollView.drawsBackground = true
         scrollView.backgroundColor = NSColor.textBackgroundColor
         scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
+        scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
 
         let contentSize = scrollView.contentSize
@@ -278,7 +534,8 @@ public struct MarkdownTextViewRepresentable: NSViewRepresentable {
         let layoutManager = NSLayoutManager()
         textStorage.addLayoutManager(layoutManager)
 
-        let textContainer = NSTextContainer(containerSize: NSSize(width: contentSize.width, height: CGFloat.greatestFiniteMagnitude))
+        let initialWidth = max(200.0, contentSize.width)
+        let textContainer = NSTextContainer(containerSize: NSSize(width: initialWidth, height: CGFloat.greatestFiniteMagnitude))
         textContainer.widthTracksTextView = true
         layoutManager.addTextContainer(textContainer)
 
@@ -287,27 +544,42 @@ public struct MarkdownTextViewRepresentable: NSViewRepresentable {
         textView.isSelectable = true
         textView.drawsBackground = true
         textView.backgroundColor = NSColor.textBackgroundColor
-        textView.textContainerInset = NSSize(width: 28, height: 28)
+        textView.textContainerInset = NSSize(width: 24, height: 24)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
 
         scrollView.documentView = textView
-        let rendered = MarkdownStyler.style(markdownText)
-        context.coordinator.currentText = markdownText
-        context.coordinator.cachedAttributedString = rendered
-        textView.textStorage?.setAttributedString(rendered)
+        // Do not set coordinator.currentText so updateNSView executes cleanly on initial mount
         return scrollView
     }
 
-    public func updateNSView(_ nsView: NSScrollView, context: Context) {
+    public func updateNSView(_ nsView: DocsScrollView, context: Context) {
         guard let textView = nsView.documentView as? NSTextView else { return }
-        if context.coordinator.currentText != markdownText {
+
+        let needsTextUpdate = (context.coordinator.currentText != markdownText)
+        let widthChanged = (abs(context.coordinator.lastWidth - nsView.contentSize.width) > 1.0)
+
+        if needsTextUpdate {
             let rendered = MarkdownStyler.style(markdownText)
             context.coordinator.currentText = markdownText
             context.coordinator.cachedAttributedString = rendered
             textView.textStorage?.setAttributedString(rendered)
             textView.scroll(NSPoint.zero)
+        }
+
+        if needsTextUpdate || widthChanged {
+            context.coordinator.lastWidth = nsView.contentSize.width
+            if let layoutManager = textView.layoutManager, let textContainer = textView.textContainer {
+                let contentWidth = max(100.0, nsView.contentSize.width)
+                let targetWidth = contentWidth - textView.textContainerInset.width * 2
+                textContainer.containerSize = NSSize(width: targetWidth, height: CGFloat.greatestFiniteMagnitude)
+                textView.frame.size.width = contentWidth
+                layoutManager.ensureLayout(for: textContainer)
+                let usedRect = layoutManager.usedRect(for: textContainer)
+                let calculatedHeight = max(usedRect.height + textView.textContainerInset.height * 2, nsView.contentSize.height)
+                textView.frame.size.height = calculatedHeight
+            }
         }
     }
 }

@@ -4,6 +4,7 @@ import XCTest
 #else
 import Foundation
 #endif
+import AppKit
 
 @MainActor
 final class AppStateTests: XCTestCase {
@@ -243,12 +244,26 @@ final class AppStateTests: XCTestCase {
 
         - Item 1
         - Item 2
+
+        1. First step
+        2. Second step
+
+        > [!NOTE]
+        > Important context note for developer &rarr; details.
+
+        > [!WARNING]
+        > Caution when stopping services.
         """
 
         let styled = MarkdownStyler.style(sampleMarkdown)
         XCTAssertTrue(styled.length > 0, "Styled markdown string should not be empty")
         XCTAssertTrue(styled.string.contains("Heading 1"))
         XCTAssertTrue(styled.string.contains("Item 1"))
+        XCTAssertTrue(styled.string.contains("1. First step"))
+        XCTAssertTrue(styled.string.contains("2. Second step"))
+        XCTAssertTrue(styled.string.contains("📘 NOTE"))
+        XCTAssertTrue(styled.string.contains("Important context note for developer → details."))
+        XCTAssertTrue(styled.string.contains("🛑 WARNING"))
         XCTAssertTrue(styled.string.contains("sudo port install mariadb"))
 
         let tableMarkdown = """
@@ -259,6 +274,25 @@ final class AppStateTests: XCTestCase {
         let styledTable = MarkdownStyler.style(tableMarkdown)
         XCTAssertTrue(styledTable.string.contains("Service │ Port"))
         XCTAssertTrue(styledTable.string.contains("Nginx   │ 80"))
+
+        // Multi-line wrapped table with links and breaks
+        let complexTableMarkdown = """
+        | Col A | Col B |
+        | :--- | :--- |
+        | [Link A](http://example.com) | Line 1<br>Line 2 with very long descriptive sentence that exceeds width |
+        """
+        let styledComplexTable = MarkdownStyler.style(complexTableMarkdown)
+        XCTAssertTrue(styledComplexTable.string.contains("Link A"))
+        XCTAssertTrue(styledComplexTable.string.contains("Line 1"))
+        XCTAssertTrue(styledComplexTable.string.contains("Line 2"))
+
+        // Verify DocsScrollView enables scrolling for long document
+        let sv = DocsScrollView(frame: NSRect(x: 0, y: 0, width: 800, height: 400))
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 800, height: 400))
+        sv.documentView = textView
+        textView.textStorage?.setAttributedString(styled)
+        sv.layout()
+        XCTAssertTrue(sv.verticalScroller != nil)
     }
 
     func testLogViewTabsAndPaths() {

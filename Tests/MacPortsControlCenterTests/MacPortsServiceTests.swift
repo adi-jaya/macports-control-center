@@ -34,6 +34,18 @@ public func XCTAssertFalse(_ cond: Bool, _ msg: String = "", file: StaticString 
     }
 }
 
+public func XCTAssertNotNil<T>(_ val: T?, _ msg: String = "", file: StaticString = #file, line: UInt = #line) {
+    guard val != nil else {
+        fatalError("Assertion failed: expected non-nil - \(msg) at \(file):\(line)")
+    }
+}
+
+public func XCTAssertNil<T>(_ val: T?, _ msg: String = "", file: StaticString = #file, line: UInt = #line) {
+    guard val == nil else {
+        fatalError("Assertion failed: expected nil - \(msg) at \(file):\(line)")
+    }
+}
+
 public func XCTFail(_ msg: String = "", file: StaticString = #file, line: UInt = #line) {
     fatalError("Test failed: \(msg) at \(file):\(line)")
 }
