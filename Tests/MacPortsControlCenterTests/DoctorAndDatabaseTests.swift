@@ -53,6 +53,14 @@ final class DoctorAndDatabaseTests: XCTestCase {
         XCTAssertTrue(createCmd.contains("--socket='/tmp/mysql.sock'"))
         XCTAssertTrue(createCmd.contains("CREATE DATABASE IF NOT EXISTS"))
         XCTAssertTrue(createCmd.contains("`new_project_db`"))
+
+        let createWithCharset = DatabaseService.buildCreateDatabaseCommand(
+            dbName: "project_utf8",
+            charset: "utf8mb4",
+            collation: "utf8mb4_unicode_ci",
+            socketPath: "/tmp/mysql.sock"
+        )
+        XCTAssertTrue(createWithCharset.contains("CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
     }
 
     func testDoctorServiceEvaluatesAllFiveGuardrailChecksAndBuildsAutoFixScript() {

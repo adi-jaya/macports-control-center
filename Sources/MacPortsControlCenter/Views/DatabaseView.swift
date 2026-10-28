@@ -112,6 +112,21 @@ public struct DatabaseView: View {
                 secondaryButton: .cancel()
             )
         }
+        .alert(isPresented: $isEngineInstallAlertPresented) {
+            Alert(
+                title: Text("Install \(selectedEngineToInstall?.name ?? "Database Engine")?"),
+                message: Text("This will execute 'port install \(selectedEngineToInstall?.portName ?? "")' via MacPorts. Make sure to stop conflicting engines on port 3306 before starting."),
+                primaryButton: .default(Text("Install Engine")) {
+                    if let port = selectedEngineToInstall?.portName {
+                        Task {
+                            await appState.installDatabaseEngine(portName: port)
+                            feedbackMessage = "Installation for \(port) queued."
+                        }
+                    }
+                },
+                secondaryButton: .cancel()
+            )
+        }
     }
 
     // MARK: - Header
@@ -300,8 +315,8 @@ public struct DatabaseView: View {
                     title: "MariaDB 10.11 LTS",
                     subtitle: "Fast, resilient, and enterprise-grade relational database",
                     portName: "mariadb-10.11-server",
-                    isInstalled: true,
-                    isActive: true
+                    isInstalled: isEngineInstalled(portName: "mariadb-10.11-server"),
+                    isActive: isEngineActive(portName: "mariadb-10.11-server")
                 )
 
                 // MariaDB 11.4 LTS
@@ -309,8 +324,8 @@ public struct DatabaseView: View {
                     title: "MariaDB 11.4 LTS",
                     subtitle: "Modern LTS release with optimized subqueries & InnoDB",
                     portName: "mariadb-11.4-server",
-                    isInstalled: false,
-                    isActive: false
+                    isInstalled: isEngineInstalled(portName: "mariadb-11.4-server"),
+                    isActive: isEngineActive(portName: "mariadb-11.4-server")
                 )
 
                 // MySQL 8.0 LTS
@@ -318,11 +333,41 @@ public struct DatabaseView: View {
                     title: "MySQL 8.0 LTS",
                     subtitle: "Official Oracle MySQL release with Window Functions & Roles",
                     portName: "mysql8-server",
-                    isInstalled: false,
-                    isActive: false
+                    isInstalled: isEngineInstalled(portName: "mysql8-server"),
+                    isActive: isEngineActive(portName: "mysql8-server")
                 )
             }
         }
+    }
+
+    private func isEngineInstalled(portName: String) -> Bool {
+        if appState.packages.contains(where: { $0.name == portName && $0.isInstalled }) {
+            return true
+        }
+        if appState.services.contains(where: { $0.name.contains(portName) || portName.contains($0.name) }) {
+            return true
+        }
+        if portName == "mariadb-10.11-server" {
+            return FileManager.default.fileExists(atPath: "/opt/local/etc/mariadb-10.11/my.cnf") ||
+                   FileManager.default.fileExists(atPath: "/opt/local/var/db/mariadb-10.11")
+        } else if portName == "mariadb-11.4-server" {
+            return FileManager.default.fileExists(atPath: "/opt/local/etc/mariadb-11.4/my.cnf") ||
+                   FileManager.default.fileExists(atPath: "/opt/local/var/db/mariadb-11.4")
+        } else if portName == "mysql8-server" {
+            return FileManager.default.fileExists(atPath: "/opt/local/etc/mysql8/my.cnf")
+        }
+        return false
+    }
+
+    private func isEngineActive(portName: String) -> Bool {
+        let matchingService = appState.services.first { $0.name.contains(portName) || portName.contains($0.name) }
+        if let s = matchingService, s.isRunning {
+            return true
+        }
+        if portName == "mariadb-10.11-server" && isSocketConnected {
+            return true
+        }
+        return false
     }
 
     private func engineCard(
@@ -389,21 +434,6 @@ public struct DatabaseView: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(isActive ? Color.green.opacity(0.3) : Color.secondary.opacity(0.15), lineWidth: 1)
         )
-        .alert(isPresented: $isEngineInstallAlertPresented) {
-            Alert(
-                title: Text("Install \(selectedEngineToInstall?.name ?? "Database Engine")?"),
-                message: Text("This will execute 'port install \(selectedEngineToInstall?.portName ?? "")' via MacPorts. Make sure to stop conflicting engines on port 3306 before starting."),
-                primaryButton: .default(Text("Install Engine")) {
-                    if let port = selectedEngineToInstall?.portName {
-                        Task {
-                            await appState.installDatabaseEngine(portName: port)
-                            feedbackMessage = "Installation for \(port) queued."
-                        }
-                    }
-                },
-                secondaryButton: .cancel()
-            )
-        }
     }
 
     // MARK: - Databases Explorer Section
@@ -715,7 +745,7 @@ public struct CreateDatabaseSheet: View {
                     isCreating = true
                     let name = dbName.trimmingCharacters(in: .whitespacesAndNewlines)
                     Task {
-                        await appState.createDatabase(name: name)
+                        await appState.createDatabase(name: name, charset: charset, collation: collation)
                         isCreating = false
                         onCreated(name)
                         isPresented = false

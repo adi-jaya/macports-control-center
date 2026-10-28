@@ -805,8 +805,8 @@ public final class AppState: ObservableObject {
         await refreshDatabases()
     }
 
-    public func createDatabase(name: String) async {
-        let cmd = DatabaseService.buildCreateDatabaseCommand(dbName: name, socketPath: defaultSocketPath)
+    public func createDatabase(name: String, charset: String = "", collation: String = "") async {
+        let cmd = DatabaseService.buildCreateDatabaseCommand(dbName: name, charset: charset, collation: collation, socketPath: defaultSocketPath)
         _ = await commandRunner.runShell(cmd, label: "create-db-\(name)")
         await refreshDatabases()
     }

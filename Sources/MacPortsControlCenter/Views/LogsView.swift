@@ -405,11 +405,9 @@ public struct LogsView: View {
                 fileHandle.seek(toFileOffset: 0)
             }
             let data = fileHandle.readDataToEndOfFile()
-            if let str = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .ascii) {
-                self.logContent = str
-            }
-        } else if let content = try? String(contentsOfFile: path, encoding: .utf8) {
-            self.logContent = content
+            self.logContent = String(decoding: data, as: UTF8.self)
+        } else if let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+            self.logContent = String(decoding: data, as: UTF8.self)
         }
     }
 
@@ -430,11 +428,13 @@ public struct LogsView: View {
 
     private func startAutoTailTimer() {
         stopAutoTailTimer()
-        timerSubscription = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
             if isAutoTailEnabled {
                 reloadLog()
             }
         }
+        RunLoop.current.add(timer, forMode: .common)
+        timerSubscription = timer
     }
 
     private func stopAutoTailTimer() {

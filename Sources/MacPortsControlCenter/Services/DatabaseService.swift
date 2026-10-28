@@ -41,10 +41,19 @@ public struct DatabaseService {
     }
 
     /// Builds command to create a new database safely
-    public static func buildCreateDatabaseCommand(dbName: String, socketPath: String = defaultSocketPath) -> String {
+    public static func buildCreateDatabaseCommand(
+        dbName: String,
+        charset: String = "",
+        collation: String = "",
+        socketPath: String = defaultSocketPath
+    ) -> String {
         let safeSocket = quoteArg(socketPath)
         let sanitizedDbName = dbName.replacingOccurrences(of: "`", with: "``")
-        let escapedSql = "CREATE DATABASE IF NOT EXISTS `\(sanitizedDbName)`;"
+        let sanitizedCharset = charset.filter { $0.isLetter || $0.isNumber || $0 == "_" }
+        let sanitizedCollation = collation.filter { $0.isLetter || $0.isNumber || $0 == "_" }
+        let charsetClause = sanitizedCharset.isEmpty ? "" : " CHARACTER SET \(sanitizedCharset)"
+        let collationClause = sanitizedCollation.isEmpty ? "" : " COLLATE \(sanitizedCollation)"
+        let escapedSql = "CREATE DATABASE IF NOT EXISTS `\(sanitizedDbName)`\(charsetClause)\(collationClause);"
         return "\(mysqlBinary) -u root --socket=\(safeSocket) -e \(quoteArg(escapedSql))"
     }
 
