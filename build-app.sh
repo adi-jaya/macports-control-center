@@ -43,6 +43,12 @@ chmod +x "${MACOS_DIR}/${BINARY_NAME}"
 echo "[2/4] Copying Info.plist and documentation resources..."
 cp "${REPO_DIR}/Resources/Info.plist" "${CONTENTS_DIR}/Info.plist"
 
+# Copy AppIcon.icns if available
+if [ -f "${REPO_DIR}/Resources/AppIcon.icns" ]; then
+    echo "      Including custom AppIcon.icns..."
+    cp "${REPO_DIR}/Resources/AppIcon.icns" "${RESOURCES_DIR}/AppIcon.icns"
+fi
+
 # Copy all repository markdown documentation into app bundle Resources
 find "${REPO_DIR}" -maxdepth 1 -name "*.md" -exec cp {} "${RESOURCES_DIR}/" \;
 
