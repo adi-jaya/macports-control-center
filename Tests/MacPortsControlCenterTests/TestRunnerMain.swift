@@ -108,6 +108,34 @@ struct TestRunnerMain {
         configTests.tearDown()
 
         print("All ConfigFileServiceTests passed successfully (8/8 tests)")
+
+        print("Running DoctorAndDatabaseTests...")
+        let doctorDbTests = DoctorAndDatabaseTests()
+        doctorDbTests.setUp()
+        doctorDbTests.testParseShowDatabasesFiltersHeaderAndSystemSchemas()
+        doctorDbTests.tearDown()
+
+        doctorDbTests.setUp()
+        doctorDbTests.testBuildDumpAndImportCommandsUseSocketAndSafeQuoting()
+        doctorDbTests.tearDown()
+
+        doctorDbTests.setUp()
+        doctorDbTests.testDoctorServiceEvaluatesAllFiveGuardrailChecksAndBuildsAutoFixScript()
+        doctorDbTests.tearDown()
+
+        doctorDbTests.setUp()
+        doctorDbTests.testDoctorServiceOsascriptCommandAndStoragePermissionsCommand()
+        doctorDbTests.tearDown()
+
+        doctorDbTests.setUp()
+        doctorDbTests.testDoctorServiceEdgeCasesAllHealthyAndSocketLogic()
+        doctorDbTests.tearDown()
+
+        doctorDbTests.setUp()
+        doctorDbTests.testDatabaseServiceSpecialCharactersAndEmptyOutputs()
+        doctorDbTests.tearDown()
+
+        print("All DoctorAndDatabaseTests passed successfully (6/6 tests)")
     }
 }
 #endif
