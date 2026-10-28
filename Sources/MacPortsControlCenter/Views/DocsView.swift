@@ -38,96 +38,30 @@ public struct MarkdownStyler {
     private static func cleanCellText(_ raw: String) -> String {
         var text = decodeHTMLEntities(raw)
         text = text.replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: .regularExpression)
-        // Strip markdown links [label](url) -> label to avoid artificial URL column bloating
-        if let linkRegex = try? NSRegularExpression(pattern: "\\[([^\\]]+)\\]\\([^\\)]+\\)") {
-            text = linkRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "$1")
-        }
-        text = text.replacingOccurrences(of: "**", with: "")
         return text.trimmingCharacters(in: .whitespaces)
     }
 
-    private static func wrapText(_ text: String, width: Int) -> [String] {
-        let effectiveWidth = max(4, width)
-        let rawLines = text.components(separatedBy: "\n")
-        var result: [String] = []
-
-        for rawLine in rawLines {
-            let words = rawLine.components(separatedBy: " ")
-            var current = ""
-            for word in words {
-                if word.isEmpty { continue }
-                if current.isEmpty {
-                    if word.count <= effectiveWidth {
-                        current = word
-                    } else {
-                        var rem = word
-                        while rem.count > effectiveWidth {
-                            let chunk = String(rem.prefix(effectiveWidth))
-                            result.append(chunk)
-                            rem = String(rem.dropFirst(effectiveWidth))
-                        }
-                        current = rem
-                    }
-                } else if current.count + 1 + word.count <= effectiveWidth {
-                    current += " " + word
-                } else {
-                    result.append(current)
-                    if word.count <= effectiveWidth {
-                        current = word
-                    } else {
-                        var rem = word
-                        while rem.count > effectiveWidth {
-                            let chunk = String(rem.prefix(effectiveWidth))
-                            result.append(chunk)
-                            rem = String(rem.dropFirst(effectiveWidth))
-                        }
-                        current = rem
-                    }
-                }
-            }
-            if !current.isEmpty {
-                result.append(current)
-            }
-        }
-        return result.isEmpty ? [""] : result
-    }
-
-    private static func computeColumnWidths(rows: [[String]], numCols: Int, maxTableWidth: Int = 96) -> [Int] {
+    private static func computePercentages(rows: [[String]], numCols: Int) -> [CGFloat] {
         guard numCols > 0 else { return [] }
-        var minWordWidths = Array(repeating: 3, count: numCols)
-        var naturalWidths = Array(repeating: 3, count: numCols)
-
+        var colWeights: [CGFloat] = Array(repeating: 5.0, count: numCols)
         for row in rows {
             for (i, cell) in row.enumerated() where i < numCols {
-                let words = cell.components(separatedBy: CharacterSet.whitespacesAndNewlines)
-                let maxWord = words.map { $0.count }.max() ?? 0
-                minWordWidths[i] = max(minWordWidths[i], min(maxWord, 24))
-                naturalWidths[i] = max(naturalWidths[i], cell.count)
+                let len = CGFloat(cell.count)
+                colWeights[i] = max(colWeights[i], min(len, 60.0))
             }
         }
-
-        var colWidths = naturalWidths
-        let totalBorders = 3 * numCols + 3
-        let availableWidth = max(40, maxTableWidth - totalBorders)
-        var currentTotal = colWidths.reduce(0, +)
-
-        while currentTotal > availableWidth {
-            var bestIdx: Int? = nil
-            var bestWidth = 0
-            for i in 0..<numCols {
-                if colWidths[i] > minWordWidths[i] && colWidths[i] > bestWidth {
-                    bestWidth = colWidths[i]
-                    bestIdx = i
-                }
-            }
-            guard let idx = bestIdx, bestWidth > 12 else {
-                break
-            }
-            colWidths[idx] -= 1
-            currentTotal -= 1
+        let minPct: CGFloat = numCols > 4 ? 8.0 : 12.0
+        var colPcts = colWeights
+        let sumWeights = colPcts.reduce(0, +)
+        for i in 0..<numCols {
+            colPcts[i] = max(minPct, round((colWeights[i] / sumWeights) * 100.0))
         }
-
-        return colWidths
+        let currentSum = colPcts.reduce(0, +)
+        let diff = 100.0 - currentSum
+        if let maxIdx = colPcts.indices.max(by: { colPcts[$0] < colPcts[$1] }) {
+            colPcts[maxIdx] += diff
+        }
+        return colPcts
     }
 
     public static func style(_ markdown: String) -> NSAttributedString {
@@ -137,6 +71,45 @@ public struct MarkdownStyler {
         var codeLines = [String]()
         var inTable = false
         var tableLines = [String]()
+
+        func formatCellMarkdown(_ text: String, baseFont: NSFont, baseColor: NSColor, style: NSParagraphStyle) -> NSAttributedString {
+            let processed = decodeHTMLEntities(text)
+            if let inlineAttr = try? AttributedString(markdown: processed, options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+                let mutable = NSMutableAttributedString(inlineAttr)
+                let fullRange = NSRange(location: 0, length: mutable.length)
+                mutable.addAttribute(.paragraphStyle, value: style, range: fullRange)
+                mutable.addAttribute(.font, value: baseFont, range: fullRange)
+                mutable.addAttribute(.foregroundColor, value: baseColor, range: fullRange)
+
+                for run in inlineAttr.runs {
+                    let nsRange = NSRange(run.range, in: inlineAttr)
+                    if let inline = run.inlinePresentationIntent {
+                        if inline.contains(.code) {
+                            mutable.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 11.5, weight: .medium), range: nsRange)
+                            mutable.addAttribute(.foregroundColor, value: NSColor(calibratedRed: 0.22, green: 0.74, blue: 0.97, alpha: 1.0), range: nsRange)
+                            mutable.addAttribute(.backgroundColor, value: NSColor.black.withAlphaComponent(0.18), range: nsRange)
+                        } else if inline.contains(.stronglyEmphasized) {
+                            mutable.addAttribute(.font, value: NSFont.systemFont(ofSize: baseFont.pointSize, weight: .bold), range: nsRange)
+                        } else if inline.contains(.emphasized) {
+                            mutable.addAttribute(.font, value: NSFont.systemFont(ofSize: baseFont.pointSize, weight: .semibold), range: nsRange)
+                        }
+                    }
+                    if let url = run.link {
+                        mutable.addAttribute(.link, value: url, range: nsRange)
+                        mutable.addAttribute(.foregroundColor, value: NSColor.controlAccentColor, range: nsRange)
+                        mutable.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: nsRange)
+                    }
+                }
+                mutable.append(NSAttributedString(string: "\n", attributes: [.paragraphStyle: style]))
+                return mutable
+            } else {
+                return NSAttributedString(string: (processed.isEmpty ? " " : processed) + "\n", attributes: [
+                    .font: baseFont,
+                    .foregroundColor: baseColor,
+                    .paragraphStyle: style
+                ])
+            }
+        }
 
         func flushTable() {
             guard !tableLines.isEmpty else { return }
@@ -155,61 +128,71 @@ public struct MarkdownStyler {
             }
             if !rows.isEmpty {
                 let numCols = rows.map { $0.count }.max() ?? 0
-                let colWidths = computeColumnWidths(rows: rows, numCols: numCols)
+                guard numCols > 0 else {
+                    tableLines.removeAll()
+                    inTable = false
+                    return
+                }
+
+                let colPercentages = computePercentages(rows: rows, numCols: numCols)
+
+                let table = NSTextTable()
+                table.numberOfColumns = numCols
+                table.collapsesBorders = true
+                table.setValue(100.0, type: .percentageValueType, for: .width)
 
                 let tableAttr = NSMutableAttributedString()
-                let pStyle = NSMutableParagraphStyle()
-                pStyle.lineSpacing = 1.5
-                pStyle.paragraphSpacing = 0
 
                 for (rowIndex, row) in rows.enumerated() {
-                    var cellLines: [[String]] = []
-                    for (i, cell) in row.enumerated() {
-                        let w = i < colWidths.count ? colWidths[i] : 20
-                        cellLines.append(wrapText(cell, width: w))
-                    }
-                    while cellLines.count < numCols {
-                        cellLines.append([""])
-                    }
-                    let maxLines = cellLines.map { $0.count }.max() ?? 1
+                    let isHeader = (rowIndex == 0)
+                    for colIndex in 0..<numCols {
+                        let cellContent = colIndex < row.count ? row[colIndex] : ""
+                        let block = NSTextTableBlock(table: table, startingRow: rowIndex, rowSpan: 1, startingColumn: colIndex, columnSpan: 1)
 
-                    for lineIdx in 0..<maxLines {
-                        var lineStr = ""
-                        for i in 0..<numCols {
-                            let w = i < colWidths.count ? colWidths[i] : 20
-                            let cellLine = (i < cellLines.count && lineIdx < cellLines[i].count) ? cellLines[i][lineIdx] : ""
-                            let padded = cellLine.padding(toLength: w, withPad: " ", startingAt: 0)
-                            lineStr += (i == 0 ? "  " : " │ ") + padded
+                        block.setWidth(10.0, type: .absoluteValueType, for: .padding, edge: .minX)
+                        block.setWidth(10.0, type: .absoluteValueType, for: .padding, edge: .maxX)
+                        block.setWidth(6.0, type: .absoluteValueType, for: .padding, edge: .minY)
+                        block.setWidth(6.0, type: .absoluteValueType, for: .padding, edge: .maxY)
+
+                        block.setWidth(0.5, type: .absoluteValueType, for: .border, edge: .minX)
+                        block.setWidth(0.5, type: .absoluteValueType, for: .border, edge: .maxX)
+                        block.setWidth(0.5, type: .absoluteValueType, for: .border, edge: .minY)
+                        block.setWidth(0.5, type: .absoluteValueType, for: .border, edge: .maxY)
+
+                        block.setBorderColor(NSColor.separatorColor)
+
+                        if isHeader {
+                            block.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.14)
+                        } else if rowIndex % 2 == 1 {
+                            block.backgroundColor = NSColor.textColor.withAlphaComponent(0.035)
+                        } else {
+                            block.backgroundColor = NSColor.clear
                         }
-                        lineStr += "\n"
 
-                        let isHeader = (rowIndex == 0)
-                        let font = isHeader ? NSFont.monospacedSystemFont(ofSize: 11.5, weight: .bold) : NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
-                        let color = isHeader ? NSColor.controlAccentColor : NSColor.textColor
-                        tableAttr.append(NSAttributedString(string: lineStr, attributes: [
-                            .font: font,
-                            .foregroundColor: color,
-                            .paragraphStyle: pStyle
-                        ]))
-                    }
-
-                    if rowIndex == 0 {
-                        var sepStr = "  "
-                        for (i, w) in colWidths.enumerated() {
-                            sepStr += (i == 0 ? "" : "─┼─") + String(repeating: "─", count: w)
+                        if colIndex < colPercentages.count {
+                            block.setValue(colPercentages[colIndex], type: .percentageValueType, for: .width)
                         }
-                        sepStr += "\n"
-                        tableAttr.append(NSAttributedString(string: sepStr, attributes: [
-                            .font: NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular),
-                            .foregroundColor: NSColor.secondaryLabelColor,
-                            .paragraphStyle: pStyle
-                        ]))
+
+                        let pStyle = NSMutableParagraphStyle()
+                        pStyle.textBlocks = [block]
+                        pStyle.lineSpacing = 3
+                        pStyle.paragraphSpacing = 0
+
+                        let baseFont = isHeader ? NSFont.systemFont(ofSize: 12.5, weight: .bold) : NSFont.systemFont(ofSize: 12)
+                        let baseColor = isHeader ? NSColor.controlAccentColor : NSColor.textColor
+
+                        let cellAttr = formatCellMarkdown(cellContent, baseFont: baseFont, baseColor: baseColor, style: pStyle)
+                        tableAttr.append(cellAttr)
                     }
                 }
+
+                let afterTableStyle = NSMutableParagraphStyle()
+                afterTableStyle.paragraphSpacing = 8
                 tableAttr.append(NSAttributedString(string: "\n", attributes: [
                     .font: NSFont.systemFont(ofSize: 6),
-                    .paragraphStyle: pStyle
+                    .paragraphStyle: afterTableStyle
                 ]))
+
                 result.append(tableAttr)
             }
             tableLines.removeAll()

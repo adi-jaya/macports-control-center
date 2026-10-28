@@ -272,8 +272,19 @@ final class AppStateTests: XCTestCase {
         | Nginx | 80 |
         """
         let styledTable = MarkdownStyler.style(tableMarkdown)
-        XCTAssertTrue(styledTable.string.contains("Service │ Port"))
-        XCTAssertTrue(styledTable.string.contains("Nginx   │ 80"))
+        XCTAssertTrue(styledTable.string.contains("Service"))
+        XCTAssertTrue(styledTable.string.contains("Port"))
+        XCTAssertTrue(styledTable.string.contains("Nginx"))
+        XCTAssertTrue(styledTable.string.contains("80"))
+
+        var foundTableBlock = false
+        styledTable.enumerateAttribute(.paragraphStyle, in: NSRange(location: 0, length: styledTable.length)) { value, _, stop in
+            if let p = value as? NSParagraphStyle, !p.textBlocks.isEmpty {
+                foundTableBlock = true
+                stop.pointee = true
+            }
+        }
+        XCTAssertTrue(foundTableBlock, "Expected native NSTextTableBlock in styled table")
 
         // Multi-line wrapped table with links and breaks
         let complexTableMarkdown = """
