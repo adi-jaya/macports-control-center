@@ -56,6 +56,58 @@ struct TestRunnerMain {
         cmdTests.tearDown()
 
         print("All CommandRunnerTests passed successfully (6/6 tests)")
+
+        print("Running ConfigFileServiceTests...")
+        let configTests = ConfigFileServiceTests()
+        configTests.setUp()
+        configTests.testParseAndUpdateIgnoresCommentedDirectives()
+        configTests.tearDown()
+
+        configTests.setUp()
+        configTests.testConfigureFPMWwwConfSetsUserAndUniquePort()
+        configTests.tearDown()
+
+        configTests.setUp()
+        do {
+            try configTests.testParseLaravelEnvHandlesQuotesAndComments()
+        } catch {
+            fatalError("testParseLaravelEnvHandlesQuotesAndComments failed: \(error)")
+        }
+        configTests.tearDown()
+
+        configTests.setUp()
+        configTests.testIsNginxTestOutputValidHandlesNonRootPidWarningAndRejectsSyntaxErrors()
+        configTests.tearDown()
+
+        configTests.setUp()
+        do {
+            try await configTests.testSaveVHostRollsBackWhenValidatorFails()
+        } catch {
+            fatalError("testSaveVHostRollsBackWhenValidatorFails failed: \(error)")
+        }
+        configTests.tearDown()
+
+        configTests.setUp()
+        do {
+            try configTests.testGenerateAndParseLaravelVHost()
+        } catch {
+            fatalError("testGenerateAndParseLaravelVHost failed: \(error)")
+        }
+        configTests.tearDown()
+
+        configTests.setUp()
+        do {
+            try configTests.testGenerateAndParseSPAVHostWithSSL()
+        } catch {
+            fatalError("testGenerateAndParseSPAVHostWithSSL failed: \(error)")
+        }
+        configTests.tearDown()
+
+        configTests.setUp()
+        configTests.testParseRealHostConfigsIfPresent()
+        configTests.tearDown()
+
+        print("All ConfigFileServiceTests passed successfully (8/8 tests)")
     }
 }
 #endif
