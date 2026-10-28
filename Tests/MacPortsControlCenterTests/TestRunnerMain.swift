@@ -187,7 +187,27 @@ struct TestRunnerMain {
         await appStateTests.testSetupDnsmasqUsesOsascriptAdminCommand()
         appStateTests.tearDown()
 
-        print("All AppStateTests passed successfully (12/12 tests)")
+        appStateTests.setUp()
+        await appStateTests.testDatabaseEngineInstallAndLifecycle()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        await appStateTests.testDatabaseCreateDropDumpImportCommands()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        await appStateTests.testPackageLifecycleActionsAndPortSelect()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        appStateTests.testMarkdownStylerRenderingAndAttributes()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        appStateTests.testLogViewTabsAndPaths()
+        appStateTests.tearDown()
+
+        print("All AppStateTests passed successfully (17/17 tests)")
     }
 }
 #endif

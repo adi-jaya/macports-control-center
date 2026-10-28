@@ -171,6 +171,19 @@ public final class CommandRunner: ObservableObject {
         }
         appendLine(cmdDisplay, onLine: onLine)
 
+        if ProcessInfo.processInfo.environment["TEST_RUNNER"] == "1" {
+            let fullCommand = arguments.joined(separator: " ")
+            if executable == "/usr/bin/osascript" ||
+               fullCommand.contains("/opt/local/bin/port ") ||
+               fullCommand.contains("port ") ||
+               fullCommand.contains("CREATE DATABASE") ||
+               fullCommand.contains("DROP DATABASE") ||
+               fullCommand.contains("mysqldump") ||
+               fullCommand.contains("mysql ") {
+                return CommandResult(exitCode: 0, stdout: "", stderr: "")
+            }
+        }
+
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = "/opt/local/bin:/opt/local/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:\(NSHomeDirectory())/.local/bin"
         process.environment = env

@@ -290,8 +290,14 @@ public struct MainWindowView: View {
             SitesView()
         case .php:
             PHPManagerView()
-        case .database, .packages, .logs, .docs:
-            SectionPlaceholderView(section: appState.selectedSection, appState: appState)
+        case .database:
+            DatabaseView()
+        case .packages:
+            PackagesView()
+        case .logs:
+            LogsView()
+        case .docs:
+            DocsView()
         }
     }
 }

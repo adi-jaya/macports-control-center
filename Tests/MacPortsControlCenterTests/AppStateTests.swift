@@ -159,4 +159,109 @@ final class AppStateTests: XCTestCase {
         }
         XCTAssertTrue(ranOsascript, "Expected setupDnsmasq to use osascript for /etc/resolver/test")
     }
+
+    // MARK: - Task 7 Views & Actions Tests
+
+    func testDatabaseEngineInstallAndLifecycle() async {
+        let state = AppState(autoRefreshOnInit: false)
+        await state.installDatabaseEngine(portName: "mariadb-11.4-server")
+        let ranInstall = state.commandRunner.terminalLines.contains { line in
+            line.contains("port install mariadb-11.4-server") && line.contains("port load mariadb-11.4-server")
+        }
+        XCTAssertTrue(ranInstall, "Expected installDatabaseEngine to install and load the database port")
+    }
+
+    func testDatabaseCreateDropDumpImportCommands() async {
+        let state = AppState(autoRefreshOnInit: false)
+        await state.createDatabase(name: "test_new_db")
+        let ranCreate = state.commandRunner.terminalLines.contains { line in
+            line.contains("CREATE DATABASE IF NOT EXISTS `test_new_db`")
+        }
+        XCTAssertTrue(ranCreate, "Expected createDatabase to invoke CREATE DATABASE statement")
+
+        await state.dropDatabase(name: "test_new_db")
+        let ranDrop = state.commandRunner.terminalLines.contains { line in
+            line.contains("DROP DATABASE IF EXISTS `test_new_db`")
+        }
+        XCTAssertTrue(ranDrop, "Expected dropDatabase to invoke DROP DATABASE statement")
+
+        await state.dumpDatabase(name: "test_db", outputPath: "/tmp/test.sql")
+        let ranDump = state.commandRunner.terminalLines.contains { line in
+            line.contains("mysqldump") && line.contains("test_db") && line.contains("/tmp/test.sql")
+        }
+        XCTAssertTrue(ranDump, "Expected dumpDatabase to invoke mysqldump")
+
+        await state.importDatabase(name: "test_db", inputPath: "/tmp/test.sql")
+        let ranImport = state.commandRunner.terminalLines.contains { line in
+            line.contains("mysql") && line.contains("test_db") && line.contains("/tmp/test.sql")
+        }
+        XCTAssertTrue(ranImport, "Expected importDatabase to invoke mysql with input redirection")
+    }
+
+    func testPackageLifecycleActionsAndPortSelect() async {
+        let state = AppState(autoRefreshOnInit: false)
+
+        await state.installPackage(name: "htop")
+        let ranInstall = state.commandRunner.terminalLines.contains { line in
+            line.contains("port install htop")
+        }
+        XCTAssertTrue(ranInstall, "Expected installPackage to call port install htop")
+
+        await state.activatePackage(name: "php83", version: "@8.3.36_0")
+        let ranActivate = state.commandRunner.terminalLines.contains { line in
+            line.contains("port activate php83 @8.3.36_0")
+        }
+        XCTAssertTrue(ranActivate, "Expected activatePackage to include port name and @version")
+
+        await state.deactivatePackage(name: "php83", version: "8.3.36_0")
+        let ranDeactivate = state.commandRunner.terminalLines.contains { line in
+            line.contains("port deactivate php83 @8.3.36_0")
+        }
+        XCTAssertTrue(ranDeactivate, "Expected deactivatePackage to format version with @ prefix")
+
+        await state.uninstallPackage(name: "curl", version: "@8.7.1_0")
+        let ranUninstall = state.commandRunner.terminalLines.contains { line in
+            line.contains("port -N uninstall curl @8.7.1_0")
+        }
+        XCTAssertTrue(ranUninstall, "Expected uninstallPackage to call port -N uninstall with version")
+
+        await state.upgradePackage(name: "nginx")
+        let ranUpgrade = state.commandRunner.terminalLines.contains { line in
+            line.contains("port upgrade nginx")
+        }
+        XCTAssertTrue(ranUpgrade, "Expected upgradePackage to call port upgrade")
+    }
+
+    func testMarkdownStylerRenderingAndAttributes() {
+        let sampleMarkdown = """
+        # Heading 1
+        This is a **bold text** and *italic*.
+
+        ```bash
+        sudo port install mariadb
+        ```
+
+        - Item 1
+        - Item 2
+        """
+
+        let styled = MarkdownStyler.style(sampleMarkdown)
+        XCTAssertTrue(styled.length > 0, "Styled markdown string should not be empty")
+        XCTAssertTrue(styled.string.contains("Heading 1"))
+        XCTAssertTrue(styled.string.contains("Item 1"))
+    }
+
+    func testLogViewTabsAndPaths() {
+        let tabs = LogTypeTab.allCases
+        XCTAssertEqual(tabs.count, 4)
+        XCTAssertEqual(tabs[0], .nginxError)
+        XCTAssertEqual(tabs[1], .nginxAccess)
+        XCTAssertEqual(tabs[2], .phpFpm)
+        XCTAssertEqual(tabs[3], .mariaDB)
+
+        for tab in tabs {
+            XCTAssertFalse(tab.rawValue.isEmpty)
+            XCTAssertFalse(tab.icon.isEmpty)
+        }
+    }
 }

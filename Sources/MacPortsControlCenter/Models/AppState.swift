@@ -697,7 +697,11 @@ public final class AppState: ObservableObject {
     // MARK: - Package Actions
     public func searchPackages(query: String) async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        packageSearchQuery = trimmed
+        guard !trimmed.isEmpty else {
+            await loadInstalledPackages()
+            return
+        }
 
         isSearchingPackages = true
         defer { isSearchingPackages = false }
@@ -712,6 +716,63 @@ public final class AppState: ObservableObject {
 
         let results = MacPortsService.parseSearchOutput(searchRes.stdout, installed: installedMap, outdated: outdatedSet)
         self.packages = results
+    }
+
+    public func loadInstalledPackages() async {
+        isSearchingPackages = true
+        defer { isSearchingPackages = false }
+
+        let installedRes = await commandRunner.runShell("/opt/local/bin/port installed", label: "installed-ports", serialized: false)
+        let outdatedRes = await commandRunner.runShell("/opt/local/bin/port outdated", label: "outdated-ports", serialized: false)
+        let installedItems = MacPortsService.parseInstalledPorts(installedRes.stdout)
+        let outdatedSet = MacPortsService.parseOutdatedPorts(outdatedRes.stdout)
+
+        self.packages = installedItems.map { item in
+            var updated = item
+            updated.isOutdated = outdatedSet.contains(item.name)
+            return updated
+        }
+    }
+
+    public func installPackage(name: String) async {
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port install \(name)", label: "install-\(name)")
+        await refreshAfterPackageChange()
+    }
+
+    public func activatePackage(name: String, version: String = "") async {
+        let verArg = version.isEmpty ? "" : (version.hasPrefix("@") ? version : "@\(version)")
+        let cmd = verArg.isEmpty ? "sudo -n /opt/local/bin/port activate \(name)" : "sudo -n /opt/local/bin/port activate \(name) \(verArg)"
+        _ = await commandRunner.runShell(cmd, label: "activate-\(name)")
+        await refreshAfterPackageChange()
+    }
+
+    public func deactivatePackage(name: String, version: String = "") async {
+        let verArg = version.isEmpty ? "" : (version.hasPrefix("@") ? version : "@\(version)")
+        let cmd = verArg.isEmpty ? "sudo -n /opt/local/bin/port deactivate \(name)" : "sudo -n /opt/local/bin/port deactivate \(name) \(verArg)"
+        _ = await commandRunner.runShell(cmd, label: "deactivate-\(name)")
+        await refreshAfterPackageChange()
+    }
+
+    public func uninstallPackage(name: String, version: String = "") async {
+        let verArg = version.isEmpty ? "" : (version.hasPrefix("@") ? version : "@\(version)")
+        let cmd = verArg.isEmpty ? "sudo -n /opt/local/bin/port -N uninstall \(name)" : "sudo -n /opt/local/bin/port -N uninstall \(name) \(verArg)"
+        _ = await commandRunner.runShell(cmd, label: "uninstall-\(name)")
+        await refreshAfterPackageChange()
+    }
+
+    public func upgradePackage(name: String) async {
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port upgrade \(name)", label: "upgrade-\(name)")
+        await refreshAfterPackageChange()
+    }
+
+    private func refreshAfterPackageChange() async {
+        if !packageSearchQuery.isEmpty {
+            await searchPackages(query: packageSearchQuery)
+        } else {
+            await loadInstalledPackages()
+        }
+        await refreshPHPVersions()
+        await refreshPortSelect()
     }
 
     public func runPortSelect(group: String, option: String) async {
@@ -738,6 +799,12 @@ public final class AppState: ObservableObject {
     }
 
     // MARK: - Database Actions
+    public func installDatabaseEngine(portName: String) async {
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port install \(portName) && sudo -n /opt/local/bin/port load \(portName)", label: "install-\(portName)")
+        await refreshServices()
+        await refreshDatabases()
+    }
+
     public func createDatabase(name: String) async {
         let cmd = DatabaseService.buildCreateDatabaseCommand(dbName: name, socketPath: defaultSocketPath)
         _ = await commandRunner.runShell(cmd, label: "create-db-\(name)")
