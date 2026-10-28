@@ -679,7 +679,7 @@ public struct NewVHostSheet: View {
         Task {
             do {
                 try await appState.saveVHost(fileName: targetFileName, content: content)
-                _ = await appState.commandRunner.runShell("sudo -n /opt/local/bin/port reload nginx", label: "reload-nginx")
+                await appState.reloadNginx()
                 isSaving = false
                 isPresented = false
                 onSaved(targetFileName)
@@ -784,7 +784,7 @@ public struct EditVHostSheet: View {
         Task {
             do {
                 try await appState.saveVHost(fileName: vhost.fileName, content: fileContent)
-                _ = await appState.commandRunner.runShell("sudo -n /opt/local/bin/port reload nginx", label: "reload-nginx")
+                await appState.reloadNginx()
                 isSaving = false
                 isPresented = false
                 onSaved()

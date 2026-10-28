@@ -638,7 +638,7 @@ public final class AppState: ObservableObject {
     public func deleteVHost(fileName: String) async {
         let filePath = (nginxServersPath as NSString).appendingPathComponent(fileName)
         try? FileManager.default.removeItem(atPath: filePath)
-        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port reload nginx", label: "reload-nginx-after-delete")
+        await reloadNginx()
         await refreshVHosts()
     }
 
@@ -665,8 +665,8 @@ public final class AppState: ObservableObject {
             await writeConfigFile(content: newConf, targetPath: dnsmasqConfPath)
         }
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port load dnsmasq", label: "load-dnsmasq")
-        let resolverScript = "mkdir -p /etc/resolver && echo 'nameserver 127.0.0.1' > /etc/resolver/test"
-        _ = await commandRunner.runShell("sudo -n sh -c \"\(resolverScript)\"", label: "setup-resolver-test")
+        let adminArgs = DoctorService.buildOsascriptAdminCommand(shellScript: "mkdir -p /etc/resolver && echo 'nameserver 127.0.0.1' > /etc/resolver/test")
+        _ = await commandRunner.run(executable: "/usr/bin/osascript", arguments: adminArgs, label: "setup-resolver-dnsmasq")
         await refreshServices()
     }
 

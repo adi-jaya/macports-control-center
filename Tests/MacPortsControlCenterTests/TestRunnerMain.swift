@@ -183,7 +183,11 @@ struct TestRunnerMain {
         await appStateTests.testPHPUninstallAndEcosystemCommands()
         appStateTests.tearDown()
 
-        print("All AppStateTests passed successfully (11/11 tests)")
+        appStateTests.setUp()
+        await appStateTests.testSetupDnsmasqUsesOsascriptAdminCommand()
+        appStateTests.tearDown()
+
+        print("All AppStateTests passed successfully (12/12 tests)")
     }
 }
 #endif

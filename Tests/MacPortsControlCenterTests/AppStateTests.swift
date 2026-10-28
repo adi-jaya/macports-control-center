@@ -150,4 +150,13 @@ final class AppStateTests: XCTestCase {
         }
         XCTAssertTrue(ranLeaves, "Expected uninstallPHPVersion to clean leaves")
     }
+
+    func testSetupDnsmasqUsesOsascriptAdminCommand() async {
+        let state = AppState(autoRefreshOnInit: false)
+        await state.setupDnsmasq()
+        let ranOsascript = state.commandRunner.terminalLines.contains { line in
+            line.contains("osascript") && line.contains("/etc/resolver/test")
+        }
+        XCTAssertTrue(ranOsascript, "Expected setupDnsmasq to use osascript for /etc/resolver/test")
+    }
 }
