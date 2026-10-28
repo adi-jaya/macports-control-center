@@ -136,6 +136,34 @@ struct TestRunnerMain {
         doctorDbTests.tearDown()
 
         print("All DoctorAndDatabaseTests passed successfully (6/6 tests)")
+
+        print("Running AppStateTests...")
+        let appStateTests = AppStateTests()
+        appStateTests.setUp()
+        appStateTests.testCommandPaletteFilteringMatchesQuery()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        appStateTests.testCommandPaletteFilteringEmptyReturnsAll()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        appStateTests.testDocumentationFilesListLoadsRepositoryMarkdownFiles()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        appStateTests.testNavigationSectionsEnumerationAndIdentification()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        appStateTests.testInitialStateProperties()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        appStateTests.testLoadDocContentLoadsValidMarkdown()
+        appStateTests.tearDown()
+
+        print("All AppStateTests passed successfully (6/6 tests)")
     }
 }
 #endif
