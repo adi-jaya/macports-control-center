@@ -4,28 +4,247 @@ import AppKit
 // MARK: - MarkdownStyler
 public struct MarkdownStyler {
     public static func style(_ markdown: String) -> NSAttributedString {
-        if let attr = try? AttributedString(markdown: markdown, options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .full)) {
-            let mutable = NSMutableAttributedString(attr)
+        let result = NSMutableAttributedString()
+        let lines = markdown.components(separatedBy: "\n")
+        var inCodeBlock = false
+        var codeLines = [String]()
+        var inTable = false
+        var tableLines = [String]()
 
-            // Ensure comfortable base line spacing and font hierarchy
-            let fullRange = NSRange(location: 0, length: mutable.length)
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.lineSpacing = 4
-            paragraphStyle.paragraphSpacing = 10
-            mutable.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
+        func flushTable() {
+            guard !tableLines.isEmpty else { return }
+            var rows: [[String]] = []
+            for line in tableLines {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.hasPrefix("|") && trimmed.hasSuffix("|") {
+                    let cells = trimmed.dropFirst().dropLast().components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }
+                    let isSep = cells.allSatisfy { cell in
+                        cell.allSatisfy { $0 == "-" || $0 == ":" } && !cell.isEmpty
+                    }
+                    if !isSep {
+                        rows.append(cells)
+                    }
+                }
+            }
+            if !rows.isEmpty {
+                let numCols = rows.map { $0.count }.max() ?? 0
+                var colWidths = Array(repeating: 0, count: numCols)
+                for row in rows {
+                    for (i, cell) in row.enumerated() {
+                        if i < numCols {
+                            colWidths[i] = max(colWidths[i], cell.count)
+                        }
+                    }
+                }
 
-            return mutable
+                let tableAttr = NSMutableAttributedString()
+                let pStyle = NSMutableParagraphStyle()
+                pStyle.lineSpacing = 2
+                pStyle.paragraphSpacing = 0
+
+                for (rowIndex, row) in rows.enumerated() {
+                    var lineStr = ""
+                    for (i, cell) in row.enumerated() {
+                        let w = colWidths[i]
+                        let padded = cell.padding(toLength: w, withPad: " ", startingAt: 0)
+                        lineStr += (i == 0 ? "  " : " │ ") + padded
+                    }
+                    lineStr += "\n"
+
+                    let isHeader = (rowIndex == 0)
+                    let font = isHeader ? NSFont.monospacedSystemFont(ofSize: 11.5, weight: .bold) : NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
+                    let color = isHeader ? NSColor.controlAccentColor : NSColor.textColor
+                    let rowAttr = NSAttributedString(string: lineStr, attributes: [
+                        .font: font,
+                        .foregroundColor: color,
+                        .paragraphStyle: pStyle
+                    ])
+                    tableAttr.append(rowAttr)
+
+                    if isHeader {
+                        var sepStr = "  "
+                        for (i, w) in colWidths.enumerated() {
+                            sepStr += (i == 0 ? "" : "─┼─") + String(repeating: "─", count: w)
+                        }
+                        sepStr += "\n"
+                        tableAttr.append(NSAttributedString(string: sepStr, attributes: [
+                            .font: NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular),
+                            .foregroundColor: NSColor.secondaryLabelColor,
+                            .paragraphStyle: pStyle
+                        ]))
+                    }
+                }
+                tableAttr.append(NSAttributedString(string: "\n", attributes: [
+                    .font: NSFont.systemFont(ofSize: 6),
+                    .paragraphStyle: pStyle
+                ]))
+                result.append(tableAttr)
+            }
+            tableLines.removeAll()
+            inTable = false
         }
 
-        // Fallback plain rendering
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineSpacing = 4
-        paragraphStyle.paragraphSpacing = 10
-        return NSAttributedString(string: markdown, attributes: [
-            .font: NSFont.systemFont(ofSize: 13),
-            .foregroundColor: NSColor.textColor,
-            .paragraphStyle: paragraphStyle
-        ])
+        func flushCodeBlock() {
+            guard inCodeBlock else { return }
+            let codeText = codeLines.joined(separator: "\n") + "\n"
+            let codeStyle = NSMutableParagraphStyle()
+            codeStyle.lineSpacing = 3
+            codeStyle.paragraphSpacing = 8
+            codeStyle.headIndent = 16
+            codeStyle.firstLineHeadIndent = 16
+
+            let codeAttr = NSAttributedString(string: codeText, attributes: [
+                .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
+                .foregroundColor: NSColor(calibratedRed: 0.22, green: 0.74, blue: 0.97, alpha: 1.0),
+                .backgroundColor: NSColor.black.withAlphaComponent(0.2),
+                .paragraphStyle: codeStyle
+            ])
+            result.append(codeAttr)
+            codeLines.removeAll()
+            inCodeBlock = false
+        }
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            // Code block delimiter
+            if trimmed.hasPrefix("```") {
+                if inCodeBlock {
+                    flushCodeBlock()
+                } else {
+                    flushTable()
+                    inCodeBlock = true
+                }
+                continue
+            }
+
+            if inCodeBlock {
+                codeLines.append(line)
+                continue
+            }
+
+            // Table detection
+            if trimmed.hasPrefix("|") && trimmed.hasSuffix("|") {
+                tableLines.append(line)
+                inTable = true
+                continue
+            } else if inTable {
+                flushTable()
+            }
+
+            // Headings
+            if trimmed.hasPrefix("#") {
+                var level = 0
+                for char in trimmed {
+                    if char == "#" { level += 1 } else { break }
+                }
+                if level > 0 && trimmed.count > level && trimmed[trimmed.index(trimmed.startIndex, offsetBy: level)] == " " {
+                    let headingText = String(trimmed.dropFirst(level + 1))
+                    let fontSize: CGFloat = level == 1 ? 22 : (level == 2 ? 18 : (level == 3 ? 15 : 13.5))
+                    let headingStyle = NSMutableParagraphStyle()
+                    headingStyle.paragraphSpacing = 8
+                    headingStyle.paragraphSpacingBefore = (level == 1 ? 8 : 16)
+                    let headingColor: NSColor = (level == 1) ? .controlAccentColor : .textColor
+
+                    result.append(NSAttributedString(string: headingText + "\n", attributes: [
+                        .font: NSFont.systemFont(ofSize: fontSize, weight: .bold),
+                        .foregroundColor: headingColor,
+                        .paragraphStyle: headingStyle
+                    ]))
+                    continue
+                }
+            }
+
+            // Horizontal rule
+            if trimmed == "---" || trimmed == "***" || trimmed == "___" {
+                let ruleStyle = NSMutableParagraphStyle()
+                ruleStyle.paragraphSpacing = 12
+                ruleStyle.paragraphSpacingBefore = 8
+                result.append(NSAttributedString(string: "──────────────────────────────────────────────────────\n", attributes: [
+                    .font: NSFont.systemFont(ofSize: 10),
+                    .foregroundColor: NSColor.separatorColor,
+                    .paragraphStyle: ruleStyle
+                ]))
+                continue
+            }
+
+            // Blockquote
+            if trimmed.hasPrefix(">") {
+                let quoteText = String(trimmed.dropFirst()).trimmingCharacters(in: .whitespaces)
+                let quoteStyle = NSMutableParagraphStyle()
+                quoteStyle.headIndent = 16
+                quoteStyle.firstLineHeadIndent = 16
+                quoteStyle.lineSpacing = 3
+                quoteStyle.paragraphSpacing = 6
+                result.append(NSAttributedString(string: "┃ " + quoteText + "\n", attributes: [
+                    .font: NSFont.systemFont(ofSize: 12.5),
+                    .foregroundColor: NSColor.secondaryLabelColor,
+                    .paragraphStyle: quoteStyle
+                ]))
+                continue
+            }
+
+            // Blank line
+            if trimmed.isEmpty {
+                let blankStyle = NSMutableParagraphStyle()
+                blankStyle.paragraphSpacing = 6
+                result.append(NSAttributedString(string: "\n", attributes: [
+                    .font: NSFont.systemFont(ofSize: 6),
+                    .paragraphStyle: blankStyle
+                ]))
+                continue
+            }
+
+            // Regular paragraph or list item with inline markdown formatting
+            let paraStyle = NSMutableParagraphStyle()
+            paraStyle.lineSpacing = 4
+            paraStyle.paragraphSpacing = 6
+            if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
+                paraStyle.headIndent = 20
+                paraStyle.firstLineHeadIndent = 8
+            }
+
+            let lineToFormat = line
+            if let inlineAttr = try? AttributedString(markdown: lineToFormat, options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+                let mutableInline = NSMutableAttributedString(inlineAttr)
+                let fullRange = NSRange(location: 0, length: mutableInline.length)
+                mutableInline.addAttribute(.paragraphStyle, value: paraStyle, range: fullRange)
+                mutableInline.addAttribute(.font, value: NSFont.systemFont(ofSize: 13), range: fullRange)
+                mutableInline.addAttribute(.foregroundColor, value: NSColor.textColor, range: fullRange)
+
+                for run in inlineAttr.runs {
+                    let nsRange = NSRange(run.range, in: inlineAttr)
+                    if let inline = run.inlinePresentationIntent {
+                        if inline.contains(.code) {
+                            mutableInline.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular), range: nsRange)
+                            mutableInline.addAttribute(.foregroundColor, value: NSColor(calibratedRed: 0.22, green: 0.74, blue: 0.97, alpha: 1.0), range: nsRange)
+                            mutableInline.addAttribute(.backgroundColor, value: NSColor.black.withAlphaComponent(0.15), range: nsRange)
+                        } else if inline.contains(.stronglyEmphasized) {
+                            mutableInline.addAttribute(.font, value: NSFont.systemFont(ofSize: 13, weight: .bold), range: nsRange)
+                        } else if inline.contains(.emphasized) {
+                            mutableInline.addAttribute(.font, value: NSFont.systemFont(ofSize: 13, weight: .semibold), range: nsRange)
+                        }
+                    }
+                    if let url = run.link {
+                        mutableInline.addAttribute(.link, value: url, range: nsRange)
+                        mutableInline.addAttribute(.foregroundColor, value: NSColor.controlAccentColor, range: nsRange)
+                        mutableInline.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: nsRange)
+                    }
+                }
+                result.append(mutableInline)
+                result.append(NSAttributedString(string: "\n"))
+            } else {
+                result.append(NSAttributedString(string: line + "\n", attributes: [
+                    .font: NSFont.systemFont(ofSize: 13),
+                    .foregroundColor: NSColor.textColor,
+                    .paragraphStyle: paraStyle
+                ]))
+            }
+        }
+
+        flushTable()
+        flushCodeBlock()
+        return result
     }
 }
 
@@ -35,6 +254,15 @@ public struct MarkdownTextViewRepresentable: NSViewRepresentable {
 
     public init(markdownText: String) {
         self.markdownText = markdownText
+    }
+
+    public class Coordinator {
+        var currentText: String = ""
+        var cachedAttributedString: NSAttributedString?
+    }
+
+    public func makeCoordinator() -> Coordinator {
+        Coordinator()
     }
 
     public func makeNSView(context: Context) -> NSScrollView {
@@ -59,21 +287,25 @@ public struct MarkdownTextViewRepresentable: NSViewRepresentable {
         textView.isSelectable = true
         textView.drawsBackground = true
         textView.backgroundColor = NSColor.textBackgroundColor
-        textView.textContainerInset = NSSize(width: 24, height: 24)
+        textView.textContainerInset = NSSize(width: 28, height: 28)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
 
         scrollView.documentView = textView
         let rendered = MarkdownStyler.style(markdownText)
+        context.coordinator.currentText = markdownText
+        context.coordinator.cachedAttributedString = rendered
         textView.textStorage?.setAttributedString(rendered)
         return scrollView
     }
 
     public func updateNSView(_ nsView: NSScrollView, context: Context) {
         guard let textView = nsView.documentView as? NSTextView else { return }
-        let rendered = MarkdownStyler.style(markdownText)
-        if textView.textStorage?.string != rendered.string {
+        if context.coordinator.currentText != markdownText {
+            let rendered = MarkdownStyler.style(markdownText)
+            context.coordinator.currentText = markdownText
+            context.coordinator.cachedAttributedString = rendered
             textView.textStorage?.setAttributedString(rendered)
             textView.scroll(NSPoint.zero)
         }

@@ -54,6 +54,20 @@ open "build/MacPorts Control Center.app"
 TEST_RUNNER=1 /tmp/run-all-tests
 ```
 
+### 🎨 Mengelola & Menyesuaikan Icon Aplikasi (AppIcon)
+
+Aplikasi telah dilengkapi bundle metadata (`Resources/Info.plist`) dan icon bawaan (`Resources/AppIcon.icns`). Anda dapat mengganti icon aplikasi menggunakan gambar PNG desain Anda sendiri:
+
+```bash
+# 1. Konversi gambar PNG apa saja (disarankan 1024x1024) ke format macOS .icns
+./scripts/generate_icon.sh /path/ke/gambar-logo.png
+
+# 2. Kompilasi ulang bundel aplikasi dengan icon baru
+./build-app.sh
+```
+
+*Script `generate_icon.sh` menggunakan utilitas bawaan macOS (`sips` dan `iconutil`) tanpa memerlukan dependensi pihak ketiga.*
+
 ---
 
 ## 🗂️ Struktur Dokumen di Folder Ini
@@ -65,7 +79,8 @@ TEST_RUNNER=1 /tmp/run-all-tests
 | 📄 [`FINAL_MACPORTS_ENVIRONMENT_SETUP.md`](FINAL_MACPORTS_ENVIRONMENT_SETUP.md) | **Dokumentasi Utama:** Detail teknis stack yang saat ini aktif (PHP 8.3, Nginx, MariaDB, Composer, Node), port/socket, dan status layanan. |
 | 📄 [`HANDOFF_MACPORTS_MIGRATION.md`](HANDOFF_MACPORTS_MIGRATION.md) | **Riwayat & Latar Belakang:** Catatan teknis migrasi dari FlyEnv dan Herd (alasan inkompatibilitas C++ SDK macOS Monterey, migrasi 24 database). |
 | 📄 [**`AGENTS.md`**](AGENTS.md) | **Petunjuk & Aturan AI Agents:** Pedoman arsitektur, guardrails, konvensi hak akses file, dan perintah terminal untuk AI coding assistant. |
-| 📁 [`scripts/`](scripts/) | **Koleksi Skrip Otomasi:** Berisi skrip shell yang digunakan selama proses migrasi (`setup_webserver.sh`, `migrate_mariadb.sh`, `cleanup_herd_root.sh`, `cleanup_flyenv_root.sh`). |
+| 📁 [`Resources/`](Resources/) | **Resource Bundel macOS:** Berisi metadata aplikasi [`Resources/Info.plist`](Resources/Info.plist) dan berkas icon resmi [`Resources/AppIcon.icns`](Resources/AppIcon.icns). |
+| 📁 [`scripts/`](scripts/) | **Koleksi Skrip Otomasi:** Berisi skrip shell yang digunakan selama proses migrasi serta utilitas developer ([`scripts/generate_icon.sh`](scripts/generate_icon.sh), `setup_webserver.sh`, `migrate_mariadb.sh`, `cleanup_herd_root.sh`, `cleanup_flyenv_root.sh`). |
 | 📁 [`config_templates/`](config_templates/) | **Salinan Konfigurasi:** Template cadangan `nginx.conf`, `php.ini`, `php-fpm.conf`, `www.conf`, dan contoh blok vhost server. |
 
 ---

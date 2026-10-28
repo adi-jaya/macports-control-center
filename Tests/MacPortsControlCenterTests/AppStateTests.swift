@@ -249,6 +249,16 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(styled.length > 0, "Styled markdown string should not be empty")
         XCTAssertTrue(styled.string.contains("Heading 1"))
         XCTAssertTrue(styled.string.contains("Item 1"))
+        XCTAssertTrue(styled.string.contains("sudo port install mariadb"))
+
+        let tableMarkdown = """
+        | Service | Port |
+        | :--- | :--- |
+        | Nginx | 80 |
+        """
+        let styledTable = MarkdownStyler.style(tableMarkdown)
+        XCTAssertTrue(styledTable.string.contains("Service │ Port"))
+        XCTAssertTrue(styledTable.string.contains("Nginx   │ 80"))
     }
 
     func testLogViewTabsAndPaths() {

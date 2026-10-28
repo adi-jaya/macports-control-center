@@ -22,6 +22,7 @@ Repositori dokumentasi ini dibangun dengan pendekatan *zero-dependency build* (t
 | Lapisan / Komponen | Bahasa & Teknologi | Lokasi Berkas | Peran & Detail Implementasi |
 | :--- | :--- | :--- | :--- |
 | **Aplikasi GUI Desktop** | **Swift Native** (SwiftUI + AppKit) | [`Sources/`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/Sources)<br>[`build-app.sh`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/build-app.sh) | Aplikasi native macOS 12+ mandiri (*zero-dependency*, ~14–22 MB RAM, ~4.2 MB binary). Mengelola 7 tab visual (Services & Doctor, Sites, PHP, Databases, Packages, Logs, Docs), terminal drawer streaming async, dan Menu Bar extra controller (`NSStatusItem`). Dikompilasi via `./build-app.sh`. |
+| **Resource & Metadata Bundel** | **macOS Bundle Spec** (Plist & ICNS) | [`Resources/Info.plist`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/Resources/Info.plist)<br>[`Resources/AppIcon.icns`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/Resources/AppIcon.icns)<br>[`scripts/generate_icon.sh`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/scripts/generate_icon.sh) | Metadata bundel aplikasi macOS, identifier (`com.adijaya.macports-control-center`), deklarasi icon `AppIcon`, dan generator icon `.icns` otomatis dari gambar PNG resolusi tinggi. |
 | **Backend Web Viewer** | **PHP** (Native 8.3+) | [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php) | Mini-controller mandiri tanpa framework. Menangani routing `?file=`, sanitasi input, membaca markdown via `file_get_contents`, dan menyajikan konten ke frontend dalam format JSON. |
 | **Frontend Markdown Parser** | **JavaScript (ES6+)** | [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php) | Parsing Markdown ke elemen DOM secara dinamis di browser menggunakan CDN [`marked.js`](https://cdn.jsdelivr.net/npm/marked/marked.min.js) (*no build step*). |
 | **Styling & Antarmuka** | **HTML5 & CSS3** | [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php) | Tata letak Flexbox modern dengan *Dark Theme* (`#0f172a`, `#1e293b`, `#38bdf8`), tipografi Apple System Font, styling tabel Markdown, dan navigasi sidebar interaktif. |
@@ -152,6 +153,21 @@ Konsultasikan dokumen berikut hanya saat pemicu (*trigger*) yang relevan aktif:
 3. **Completion Criterion:**
    - Bundel aplikasi valid dan dapat dijalankan: `open "build/MacPorts Control Center.app"`
    - Seluruh test suite lulus tanpa kegagalan (exit code 0).
+
+### 📋 SOP 5: Kustomisasi Icon Aplikasi & Resource Bundel
+1. Siapkan gambar PNG persegi (disarankan 1024×1024 piksel dengan transparansi).
+2. Jalankan generator icon:
+   ```bash
+   ./scripts/generate_icon.sh /path/ke/gambar.png
+   ```
+   Perintah ini menghasilkan iconset 10 ukuran (@1x dan @2x Retina) dan mengompilasi menjadi `Resources/AppIcon.icns`.
+3. Kompilasi ulang bundel aplikasi:
+   ```bash
+   ./build-app.sh
+   ```
+4. **Completion Criterion:**
+   - `Resources/AppIcon.icns` terpasang di `build/MacPorts Control Center.app/Contents/Resources/AppIcon.icns`.
+   - Jalankan `open "build/MacPorts Control Center.app"` dan pastikan icon tampil di Dock dan Finder.
 
 ---
 
