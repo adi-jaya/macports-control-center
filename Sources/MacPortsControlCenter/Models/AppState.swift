@@ -512,6 +512,19 @@ public final class AppState: ObservableObject {
     }
 
     // MARK: - PHP Actions
+    public func writeConfigFile(content: String, targetPath: String) async {
+        do {
+            try content.write(toFile: targetPath, atomically: true, encoding: .utf8)
+        } catch {
+            // If direct write fails (e.g. root-owned destination), write to temp file and copy via sudo
+            let tempPath = (NSTemporaryDirectory() as NSString).appendingPathComponent("config.\(UUID().uuidString)")
+            if (try? content.write(toFile: tempPath, atomically: true, encoding: .utf8)) != nil {
+                _ = await commandRunner.runShell("sudo -n /bin/cp '\(tempPath)' '\(targetPath)'", label: "copy-config-file")
+                try? FileManager.default.removeItem(atPath: tempPath)
+            }
+        }
+    }
+
     public func installPHPBundle(_ version: String) async {
         let v = version.replacingOccurrences(of: ".", with: "")
         let portName = "php\(v)"
@@ -533,14 +546,20 @@ public final class AppState: ObservableObject {
 
         // Auto-configure www.conf with current user and unique port
         let wwwConfPath = "/opt/local/etc/\(portName)/php-fpm.d/www.conf"
-        if let existing = try? String(contentsOfFile: wwwConfPath, encoding: .utf8) {
+        let defaultConfPath = "/opt/local/etc/\(portName)/php-fpm.d/www.conf.default"
+        var contentToConfigure: String? = try? String(contentsOfFile: wwwConfPath, encoding: .utf8)
+        if contentToConfigure == nil {
+            contentToConfigure = try? String(contentsOfFile: defaultConfPath, encoding: .utf8)
+        }
+
+        if let existing = contentToConfigure {
             let updated = ConfigFileService.configureFPMWwwConf(
                 content: existing,
                 version: v,
                 user: NSUserName(),
                 group: "staff"
             )
-            try? updated.write(toFile: wwwConfPath, atomically: true, encoding: .utf8)
+            await writeConfigFile(content: updated, targetPath: wwwConfPath)
         }
 
         await refreshPHPVersions()

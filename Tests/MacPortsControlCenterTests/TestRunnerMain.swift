@@ -163,7 +163,15 @@ struct TestRunnerMain {
         appStateTests.testLoadDocContentLoadsValidMarkdown()
         appStateTests.tearDown()
 
-        print("All AppStateTests passed successfully (6/6 tests)")
+        appStateTests.setUp()
+        await appStateTests.testWriteConfigFileDirectSuccess()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        await appStateTests.testWriteConfigFileFallsBackToSudoCpOnWriteError()
+        appStateTests.tearDown()
+
+        print("All AppStateTests passed successfully (8/8 tests)")
     }
 }
 #endif

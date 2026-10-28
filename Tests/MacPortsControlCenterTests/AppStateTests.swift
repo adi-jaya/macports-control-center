@@ -70,4 +70,27 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(content.isEmpty)
         XCTAssertTrue(content.contains("MacPorts") || content.contains("#"))
     }
+
+    func testWriteConfigFileDirectSuccess() async {
+        let state = AppState(autoRefreshOnInit: false)
+        let tempTarget = (NSTemporaryDirectory() as NSString).appendingPathComponent("test_write_\(UUID().uuidString).conf")
+        defer { try? FileManager.default.removeItem(atPath: tempTarget) }
+
+        await state.writeConfigFile(content: "user = test\ngroup = staff", targetPath: tempTarget)
+        let readBack = try? String(contentsOfFile: tempTarget, encoding: .utf8)
+        XCTAssertEqual(readBack, "user = test\ngroup = staff")
+    }
+
+    func testWriteConfigFileFallsBackToSudoCpOnWriteError() async {
+        let state = AppState(autoRefreshOnInit: false)
+        // A destination where user has no write permission
+        let unwritableTarget = "/opt/local/etc/non_existent_dir_\(UUID().uuidString)/www.conf"
+
+        await state.writeConfigFile(content: "user = adijaya\ngroup = staff", targetPath: unwritableTarget)
+        // CommandRunner should have recorded a sudo -n /bin/cp attempt
+        let ranCp = state.commandRunner.terminalLines.contains { line in
+            line.contains("sudo -n /bin/cp") && line.contains(unwritableTarget)
+        }
+        XCTAssertTrue(ranCp, "Expected sudo -n /bin/cp command to be invoked when direct write fails")
+    }
 }

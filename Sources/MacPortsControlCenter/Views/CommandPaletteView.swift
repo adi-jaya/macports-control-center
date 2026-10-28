@@ -120,6 +120,9 @@ public struct CommandPaletteView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(Color.primary.opacity(0.12), lineWidth: 1)
             )
+            .onExitCommand {
+                appState.isCommandPalettePresented = false
+            }
         }
         .onAppear {
             isSearchFocused = true
