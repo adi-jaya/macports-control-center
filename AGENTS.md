@@ -21,6 +21,7 @@ Repositori dokumentasi ini dibangun dengan pendekatan *zero-dependency build* (t
 
 | Lapisan / Komponen | Bahasa & Teknologi | Lokasi Berkas | Peran & Detail Implementasi |
 | :--- | :--- | :--- | :--- |
+| **Aplikasi GUI Desktop** | **Swift Native** (SwiftUI + AppKit) | [`Sources/`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/Sources)<br>[`build-app.sh`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/build-app.sh) | Aplikasi native macOS 12+ mandiri (*zero-dependency*, ~14–22 MB RAM, ~4.2 MB binary). Mengelola 7 tab visual (Services & Doctor, Sites, PHP, Databases, Packages, Logs, Docs), terminal drawer streaming async, dan Menu Bar extra controller (`NSStatusItem`). Dikompilasi via `./build-app.sh`. |
 | **Backend Web Viewer** | **PHP** (Native 8.3+) | [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php) | Mini-controller mandiri tanpa framework. Menangani routing `?file=`, sanitasi input, membaca markdown via `file_get_contents`, dan menyajikan konten ke frontend dalam format JSON. |
 | **Frontend Markdown Parser** | **JavaScript (ES6+)** | [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php) | Parsing Markdown ke elemen DOM secara dinamis di browser menggunakan CDN [`marked.js`](https://cdn.jsdelivr.net/npm/marked/marked.min.js) (*no build step*). |
 | **Styling & Antarmuka** | **HTML5 & CSS3** | [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php) | Tata letak Flexbox modern dengan *Dark Theme* (`#0f172a`, `#1e293b`, `#38bdf8`), tipografi Apple System Font, styling tabel Markdown, dan navigasi sidebar interaktif. |
@@ -136,6 +137,21 @@ Konsultasikan dokumen berikut hanya saat pemicu (*trigger*) yang relevan aktif:
 3. **Laravel Permission Denied:**
    - Periksa `/opt/local/etc/php83/php-fpm.d/www.conf`: pastikan `user = adijaya` dan `group = staff`.
    - Periksa direktori proyek: pastikan kepemilikan adalah `adijaya:staff`. Jangan jalankan `chmod -R 777`.
+
+### 📋 SOP 4: Kompilasi & Pengujian Aplikasi Desktop Swift Native
+1. **Build App Bundle Release:**
+   ```bash
+   ./build-app.sh
+   ```
+   Wajib menghasilkan bundel aplikasi bertanda tangan ad-hoc di `build/MacPorts Control Center.app` berukuran ~4.2 MB dengan verifikasi codesign sukses.
+2. **Jalankan Unit Test Suite:**
+   ```bash
+   TEST_RUNNER=1 /tmp/run-all-tests
+   ```
+   Wajib menghasilkan seluruh 42/42 pengujian unit lulus (AppState, CommandRunner, ConfigFileService, DoctorAndDatabase, MacPortsService).
+3. **Completion Criterion:**
+   - Bundel aplikasi valid dan dapat dijalankan: `open "build/MacPorts Control Center.app"`
+   - Seluruh test suite lulus tanpa kegagalan (exit code 0).
 
 ---
 

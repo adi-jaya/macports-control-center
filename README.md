@@ -1,10 +1,58 @@
-# 📚 Pusat Dokumentasi Lingkungan Web Development (MacPorts)
+# 📚 MacPorts Control Center & Pusat Dokumentasi Web Dev
 
 [![GitHub Repository](https://img.shields.io/badge/GitHub-adi--jaya%2Fmacports--control--center-181717?style=flat&logo=github)](https://github.com/adi-jaya/macports-control-center)
+[![macOS Monterey](https://img.shields.io/badge/macOS-Monterey%2012.7%2B%20(Intel%20x86__64)-0078D7?logo=apple)](https://apple.com)
+[![Swift Native](https://img.shields.io/badge/App-SwiftUI%20%2B%20AppKit%20(Native)-FA7343?logo=swift)](build-app.sh)
+[![Tests](https://img.shields.io/badge/Tests-42%2F42%20Passing-success)](Tests/)
 
 Selamat datang di repositori **MacPorts Control Center** dan pusat dokumentasi lingkungan web development native berbasis **MacPorts** pada **macOS Monterey 12.7.6 (Intel x86_64)**. Repositori publik ini tersinkronisasi di [**github.com/adi-jaya/macports-control-center**](https://github.com/adi-jaya/macports-control-center).
 
-Folder ini menyimpan seluruh panduan, catatan riwayat migrasi, konfigurasi sistem, dan template virtual host agar mudah dirujuk kembali kapan saja.
+Repositori ini menggabungkan dua peran utama:
+1. **`MacPorts Control Center.app`**: Aplikasi GUI Desktop Native macOS berbasis **SwiftUI + AppKit** yang sangat ringan (~14–22 MB RAM, ~4.2 MB binary) dilengkapi menu bar extra (`NSStatusItem`) untuk mengelola seluruh stack web dev tanpa bergantung pada PHP web server.
+2. **Dokumentasi & Knowledge Base Source of Truth**: Dokumentasi teknis, template konfigurasi acuan, dan skrip otomasi sistem untuk runtime Nginx, PHP-FPM, dan MariaDB.
+
+---
+
+## 🖥️ Aplikasi Desktop: `MacPorts Control Center.app`
+
+`MacPorts Control Center.app` adalah aplikasi GUI native macOS berarsitektur **zero-dependency** (hanya menggunakan Apple macOS SDK bawaan) yang dirancang khusus untuk mengelola lingkungan development MacPorts secara visual, cepat, dan aman.
+
+### 🌟 Fitur Utama & 7 Tab Navigasi
+
+| Tab | Nama Fitur | Kemampuan & Operasi |
+| :---: | :--- | :--- |
+| 1 | **Services & Doctor** | Auto-discovery LaunchDaemons (`/Library/LaunchDaemons/org.macports.*`), deteksi proses aktif (`ps aux`), kontrol Start/Stop/Restart, dan **1-Click Stack Doctor Auto-Fix** untuk menegakkan 5 positive guardrails. |
+| 2 | **Virtual Hosts** | Visual explorer untuk berkas konfigurasi `/opt/local/etc/nginx/servers/*.conf`, deteksi konflik port, validasi sintaks `nginx -t`, dan deteksi otomatis konfigurasi Laravel `.env`. |
+| 3 | **PHP Manager** | Manajemen concurrent multi-PHP FPM pools (PHP 8.1 s/d 8.5), switcher PHP CLI global (`port select`), checkbox installer ekstensi PHP subport (`php83-curl`, `php83-mbstring`, dll.), dan live editor `php.ini`. |
+| 4 | **Databases** | Status engine MariaDB/MySQL via socket Unix `/tmp/mysql.sock`, explorer 24+ database, **1-Click Backup `.sql`** via `NSSavePanel` + `mysqldump`, **1-Click Import `.sql`** via `NSOpenPanel`, serta installer MariaDB 11.4 LTS dan MySQL 8. |
+| 5 | **MacPorts Packages** | Universal package search (`port search`), filter tab (*All / Installed / Outdated*), manajemen multi-versi port (`name@version`), upgrade outdated ports, pembersih dependency (`uninstall leaves`), dan toolchain switcher dinamis (`port select`). |
+| 6 | **Server Logs** | Real-time live log tailer untuk Nginx (`error.log`, `access.log`), PHP-FPM (`php-fpm.log`), dan MariaDB (`*.err`) dilengkapi banner **🔓 Perbaiki Izin Baca Log (Stack Doctor)** otomatis saat izin file terbatas (`0600 root:admin`). |
+| 7 | **Documentation** | Built-in native Markdown reader (*zero-WebKit*, *zero-Electron*) yang merender dokumentasi repositori (`*.md`) langsung dari bundel aplikasi menggunakan `NSTextView` dan `NSAttributedString`. |
+
+### 🟢 macOS Menu Bar Extra (`NSStatusItem`)
+Aplikasi tetap berjalan di Menu Bar macOS dengan status indicator dinamis bahkan ketika jendela utama ditutup:
+* **Indikator Visual:** ● Hijau (Running), ● Kuning (Degraded / Updating), ● Merah (Stopped).
+* **Ringkasan Status:** Header status real-time ("Web Stack: Running", "PHP 8.3 | MariaDB 10.11").
+* **Quick Actions:** *Start Services*, *Restart Web Stack*, *Stop Services*.
+* **Quick Links:** Buka [http://localhost:80](http://localhost:80), Buka Folder Servers (`/opt/local/etc/nginx/servers`).
+* **Window Reopen:** Klik *"Open Control Center"* atau icon Dock membuka kembali jendela utama secara instan.
+
+### ⌨️ Command Palette & Live Terminal Output Drawer
+* **Command Palette (`Cmd + K`):** Quick-switcher global untuk berpindah tab atau mengeksekusi aksi sistem dengan cepat via keyboard.
+* **Docked Terminal Drawer:** Konsol terminal bawah yang melakukan streaming stdout/stderr proses anak MacPorts secara asynchronous tanpa mengunci antarmuka, dilengkapi tombol pembatalan proses (⏹) dan pembersih log.
+
+### 📦 Cara Build & Menjalankan Aplikasi
+
+```bash
+# 1. Kompilasi & buat paket .app release mandiri (ad-hoc signed)
+./build-app.sh
+
+# 2. Jalankan aplikasi
+open "build/MacPorts Control Center.app"
+
+# 3. Jalankan rangkaian unit test suite (42/42 tests passing)
+TEST_RUNNER=1 /tmp/run-all-tests
+```
 
 ---
 
