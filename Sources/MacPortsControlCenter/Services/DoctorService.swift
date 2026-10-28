@@ -127,6 +127,28 @@ public struct DoctorService {
         chmod 644 /opt/local/var/log/php*/*.log 2>/dev/null || true
         chmod 644 /opt/local/var/log/nginx/*.log 2>/dev/null || true
         chown -R '\(safeUser):admin' /opt/local/var/log/php* 2>/dev/null || true
+
+        # 4. Fix PHP-FPM pool user, group, and permissions
+        mkdir -p /opt/local/etc
+        chown -R '\(safeUser):admin' /opt/local/etc/php* 2>/dev/null || true
+        chmod 775 /opt/local/etc/php* /opt/local/etc/php*/php-fpm.d 2>/dev/null || true
+        chmod 664 /opt/local/etc/php*/php-fpm.d/*.conf 2>/dev/null || true
+
+        for conf in /opt/local/etc/php*/php-fpm.d/www.conf; do
+            if [ -f "$conf" ]; then
+                if grep -q -E '^[[:space:]]*user[[:space:]]*=' "$conf"; then
+                    sed -i '' -E 's/^[[:space:]]*user[[:space:]]*=.*/user = \(safeUser)/' "$conf"
+                else
+                    echo "user = \(safeUser)" >> "$conf"
+                fi
+
+                if grep -q -E '^[[:space:]]*group[[:space:]]*=' "$conf"; then
+                    sed -i '' -E 's/^[[:space:]]*group[[:space:]]*=.*/group = staff/' "$conf"
+                else
+                    echo "group = staff" >> "$conf"
+                fi
+            fi
+        done
         """
     }
 

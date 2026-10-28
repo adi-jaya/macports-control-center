@@ -691,6 +691,27 @@ public final class AppState: ObservableObject {
         let osascriptText = "do shell script \"\(escapedScript)\" with administrator privileges"
         let singleQuoted = osascriptText.replacingOccurrences(of: "'", with: "'\\''")
         _ = await commandRunner.runShell("/usr/bin/osascript -e '\(singleQuoted)'", label: "doctor-autofix")
+
+        // Normalize multi-PHP FPM pool configuration and ports via ConfigFileService
+        let currentUserName = NSUserName()
+        for v in ["81", "82", "83", "84", "85"] {
+            let confPath = "/opt/local/etc/php\(v)/php-fpm.d/www.conf"
+            let defaultConfPath = "/opt/local/etc/php\(v)/php-fpm.d/www.conf.default"
+            var contentToConfigure: String? = try? String(contentsOfFile: confPath, encoding: .utf8)
+            if contentToConfigure == nil {
+                contentToConfigure = try? String(contentsOfFile: defaultConfPath, encoding: .utf8)
+            }
+            if let existing = contentToConfigure {
+                let updated = ConfigFileService.configureFPMWwwConf(
+                    content: existing,
+                    version: v,
+                    user: currentUserName,
+                    group: "staff"
+                )
+                await writeConfigFile(content: updated, targetPath: confPath)
+            }
+        }
+
         await refreshAll()
     }
 

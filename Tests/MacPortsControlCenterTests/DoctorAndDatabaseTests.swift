@@ -83,6 +83,10 @@ final class DoctorAndDatabaseTests: XCTestCase {
         XCTAssertTrue(script.contains("/etc/sudoers.d/macports"))
         XCTAssertTrue(script.contains("/opt/local/etc/nginx/servers"))
         XCTAssertTrue(script.contains("/opt/local/var/log/php"))
+        XCTAssertTrue(script.contains("user = adijaya"))
+        XCTAssertTrue(script.contains("group = staff"))
+        XCTAssertTrue(script.contains("/opt/local/etc/php"))
+        XCTAssertTrue(script.contains("www.conf"))
     }
 
     func testDoctorServiceOsascriptCommandAndStoragePermissionsCommand() {
