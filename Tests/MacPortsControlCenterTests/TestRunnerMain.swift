@@ -3,7 +3,8 @@ import Foundation
 
 @main
 struct TestRunnerMain {
-    static func main() {
+    @MainActor
+    static func main() async {
         print("Running MacPortsServiceTests...")
         let tests = MacPortsServiceTests()
         tests.setUp()
@@ -27,6 +28,22 @@ struct TestRunnerMain {
         tests.tearDown()
 
         print("All MacPortsServiceTests passed successfully (5/5 tests)")
+
+        print("Running CommandRunnerTests...")
+        let cmdTests = CommandRunnerTests()
+        cmdTests.setUp()
+        await cmdTests.testStreamsOutputLinesAndRecordsExitCode()
+        cmdTests.tearDown()
+
+        cmdTests.setUp()
+        await cmdTests.testSerializedQueueRunsCommandsSequentially()
+        cmdTests.tearDown()
+
+        cmdTests.setUp()
+        await cmdTests.testCancelCurrentProcessTerminatesLongRunningTask()
+        cmdTests.tearDown()
+
+        print("All CommandRunnerTests passed successfully (3/3 tests)")
     }
 }
 #endif
