@@ -93,4 +93,61 @@ final class AppStateTests: XCTestCase {
         }
         XCTAssertTrue(ranCp, "Expected sudo -n /bin/cp command to be invoked when direct write fails")
     }
+
+    func testVHostAndStoragePermissionHelpers() async {
+        let tempDir = (NSTemporaryDirectory() as NSString).appendingPathComponent("vhost_test_\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let state = AppState(autoRefreshOnInit: false, nginxServersPath: tempDir)
+        let sampleVHost = VHostItem(
+            id: "sample.conf",
+            fileName: "sample.conf",
+            filePath: "\(tempDir)/sample.conf",
+            listenPort: "8088",
+            serverName: "sample.test",
+            rootPath: "/Users/adijaya/Projects/sample/public",
+            fastcgiPass: "127.0.0.1:9000",
+            sslEnabled: false
+        )
+
+        // Fix storage permissions creates correct chmod command
+        await state.fixStoragePermissions(for: sampleVHost)
+        let ranChmod = state.commandRunner.terminalLines.contains { line in
+            line.contains("chmod -R u+rwX") && line.contains("/Users/adijaya/Projects/sample/storage")
+        }
+        XCTAssertTrue(ranChmod, "Expected fixStoragePermissions to invoke chmod on storage and bootstrap/cache")
+
+        // Write a test vhost file and verify deleteVHost removes it
+        let testFile = "\(tempDir)/sample.conf"
+        try? "server { listen 8088; }".write(toFile: testFile, atomically: true, encoding: .utf8)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: testFile))
+
+        await state.deleteVHost(fileName: "sample.conf")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: testFile), "deleteVHost should remove the conf file")
+    }
+
+    func testQuickTuningLoad() {
+        let state = AppState(autoRefreshOnInit: false)
+        let tuning = state.loadQuickTuning(version: "8.3")
+        XCTAssertFalse(tuning.memoryLimit.isEmpty)
+        XCTAssertFalse(tuning.uploadMaxFilesize.isEmpty)
+        XCTAssertFalse(tuning.postMaxSize.isEmpty)
+        XCTAssertFalse(tuning.maxExecutionTime.isEmpty)
+        XCTAssertFalse(tuning.nginxClientMaxBodySize.isEmpty)
+    }
+
+    func testPHPUninstallAndEcosystemCommands() async {
+        let state = AppState(autoRefreshOnInit: false)
+        await state.uninstallPHPVersion("8.2")
+        let ranUninstall = state.commandRunner.terminalLines.contains { line in
+            line.contains("port -N uninstall --follow-dependents php82")
+        }
+        XCTAssertTrue(ranUninstall, "Expected uninstallPHPVersion to call port -N uninstall --follow-dependents")
+
+        let ranLeaves = state.commandRunner.terminalLines.contains { line in
+            line.contains("port -N uninstall leaves")
+        }
+        XCTAssertTrue(ranLeaves, "Expected uninstallPHPVersion to clean leaves")
+    }
 }

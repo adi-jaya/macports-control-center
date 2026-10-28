@@ -97,6 +97,7 @@ public struct MainWindowView: View {
                     .transition(.opacity)
             }
         }
+        .environmentObject(appState)
         .frame(minWidth: 920, minHeight: 620)
         // Hidden button to catch Cmd + K keyboard shortcut
         .background(
@@ -282,6 +283,15 @@ public struct MainWindowView: View {
     // MARK: - Content Area
     @ViewBuilder
     private var contentArea: some View {
-        SectionPlaceholderView(section: appState.selectedSection, appState: appState)
+        switch appState.selectedSection {
+        case .services:
+            ServicesView()
+        case .sites:
+            SitesView()
+        case .php:
+            PHPManagerView()
+        case .database, .packages, .logs, .docs:
+            SectionPlaceholderView(section: appState.selectedSection, appState: appState)
+        }
     }
 }

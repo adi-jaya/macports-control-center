@@ -171,7 +171,19 @@ struct TestRunnerMain {
         await appStateTests.testWriteConfigFileFallsBackToSudoCpOnWriteError()
         appStateTests.tearDown()
 
-        print("All AppStateTests passed successfully (8/8 tests)")
+        appStateTests.setUp()
+        await appStateTests.testVHostAndStoragePermissionHelpers()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        appStateTests.testQuickTuningLoad()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        await appStateTests.testPHPUninstallAndEcosystemCommands()
+        appStateTests.tearDown()
+
+        print("All AppStateTests passed successfully (11/11 tests)")
     }
 }
 #endif

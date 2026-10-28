@@ -482,6 +482,11 @@ public final class AppState: ObservableObject {
         await refreshServices()
     }
 
+    public func restartService(_ item: ServiceItem) async {
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port reload \(item.name) || (sudo -n /opt/local/bin/port unload \(item.name) && sudo -n /opt/local/bin/port load \(item.name))", label: "restart-\(item.name)")
+        await refreshServices()
+    }
+
     public func restartWebStack() async {
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port reload nginx || sudo -n /opt/local/bin/port load nginx", label: "restart-nginx")
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port reload php83-fpm || sudo -n /opt/local/bin/port load php83-fpm", label: "restart-php83-fpm")
@@ -573,6 +578,45 @@ public final class AppState: ObservableObject {
         await refreshPHPVersions()
     }
 
+    public func uninstallPHPVersion(_ version: String) async {
+        let v = version.replacingOccurrences(of: ".", with: "")
+        let portName = "php\(v)"
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port unload \(portName)-fpm", label: "unload-\(portName)-fpm")
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port -N uninstall --follow-dependents \(portName)", label: "uninstall-\(portName)")
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port -N uninstall leaves", label: "uninstall-leaves")
+        await refreshPHPVersions()
+        await refreshPortSelect()
+    }
+
+    public func loadQuickTuning(version: String) -> PHPIniTuning {
+        let v = version.replacingOccurrences(of: ".", with: "")
+        let phpIniPath = "/opt/local/etc/php\(v)/php.ini"
+        let phpIniContent = (try? String(contentsOfFile: phpIniPath, encoding: .utf8)) ?? ""
+        let nginxConfContent = (try? String(contentsOfFile: "/opt/local/etc/nginx/nginx.conf", encoding: .utf8)) ?? ""
+        return ConfigFileService.parsePHPIniTuning(phpIniContent: phpIniContent, nginxConfContent: nginxConfContent)
+    }
+
+    public func applyQuickTuning(version: String, tuning: PHPIniTuning) async {
+        let v = version.replacingOccurrences(of: ".", with: "")
+        let phpIniPath = "/opt/local/etc/php\(v)/php.ini"
+        let defaultPhpIniPath = "/opt/local/etc/php\(v)/php.ini-development"
+        var currentPHPIni = (try? String(contentsOfFile: phpIniPath, encoding: .utf8)) ?? ""
+        if currentPHPIni.isEmpty, let defContent = try? String(contentsOfFile: defaultPhpIniPath, encoding: .utf8) {
+            currentPHPIni = defContent
+        }
+        let updatedPHPIni = ConfigFileService.updatePHPIni(content: currentPHPIni, tuning: tuning)
+        await writeConfigFile(content: updatedPHPIni, targetPath: phpIniPath)
+
+        let nginxConfPath = "/opt/local/etc/nginx/nginx.conf"
+        if let currentNginxConf = try? String(contentsOfFile: nginxConfPath, encoding: .utf8) {
+            let updatedNginxConf = ConfigFileService.updateNginxClientMaxBodySize(content: currentNginxConf, maxBodySize: tuning.nginxClientMaxBodySize)
+            await writeConfigFile(content: updatedNginxConf, targetPath: nginxConfPath)
+        }
+
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port reload php\(v)-fpm || sudo -n /opt/local/bin/port load php\(v)-fpm", label: "reload-php\(v)-fpm")
+        await reloadNginx()
+    }
+
     // MARK: - VHost Actions
     public func saveVHost(
         fileName: String,
@@ -589,6 +633,55 @@ public final class AppState: ObservableObject {
             return (isValid, test.stderr)
         }
         await refreshVHosts()
+    }
+
+    public func deleteVHost(fileName: String) async {
+        let filePath = (nginxServersPath as NSString).appendingPathComponent(fileName)
+        try? FileManager.default.removeItem(atPath: filePath)
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port reload nginx", label: "reload-nginx-after-delete")
+        await refreshVHosts()
+    }
+
+    public func fixStoragePermissions(for vhost: VHostItem) async {
+        let projectRoot: String
+        if vhost.rootPath.hasSuffix("/public") {
+            projectRoot = (vhost.rootPath as NSString).deletingLastPathComponent
+        } else {
+            projectRoot = vhost.rootPath
+        }
+        let cmd = DoctorService.buildFixStoragePermissionsCommand(projectRootPath: projectRoot)
+        if !cmd.isEmpty {
+            _ = await commandRunner.runShell(cmd, label: "fix-storage-\(vhost.fileName)")
+        }
+    }
+
+    // MARK: - Ecosystem Utilities Actions
+    public func setupDnsmasq() async {
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port install dnsmasq", label: "install-dnsmasq")
+        let dnsmasqConfPath = "/opt/local/etc/dnsmasq.conf"
+        let defaultConf = (try? String(contentsOfFile: dnsmasqConfPath, encoding: .utf8)) ?? ""
+        if !defaultConf.contains("address=/.test/127.0.0.1") {
+            let newConf = defaultConf + "\naddress=/.test/127.0.0.1\nlisten-address=127.0.0.1\n"
+            await writeConfigFile(content: newConf, targetPath: dnsmasqConfPath)
+        }
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port load dnsmasq", label: "load-dnsmasq")
+        let resolverScript = "mkdir -p /etc/resolver && echo 'nameserver 127.0.0.1' > /etc/resolver/test"
+        _ = await commandRunner.runShell("sudo -n sh -c \"\(resolverScript)\"", label: "setup-resolver-test")
+        await refreshServices()
+    }
+
+    public func setupMkcert() async {
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port install mkcert", label: "install-mkcert")
+        _ = await commandRunner.runShell("mkcert -install", label: "mkcert-install-ca")
+    }
+
+    public func setupRedis() async {
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port install redis && sudo -n /opt/local/bin/port load redis", label: "install-load-redis")
+        await refreshServices()
+    }
+
+    public func setupFnmAndComposer() async {
+        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port install fnm composer", label: "install-fnm-composer")
     }
 
     // MARK: - Stack Doctor Auto-Fix
