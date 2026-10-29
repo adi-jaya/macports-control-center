@@ -44,13 +44,17 @@ Aplikasi tetap berjalan di Menu Bar macOS dengan status indicator dinamis bahkan
 ### 📦 Cara Build & Menjalankan Aplikasi
 
 ```bash
-# 1. Kompilasi & buat paket .app release mandiri (ad-hoc signed)
+# 1. Kompilasi & buat paket .app release mandiri (ad-hoc signed) di folder build/
 ./build-app.sh
 
-# 2. Jalankan aplikasi
-open "build/MacPorts Control Center.app"
+# 2. Atau kompilasi dan pasang langsung ke folder /Applications macOS
+./build-app.sh --install
 
-# 3. Jalankan rangkaian unit test suite (42/42 tests passing)
+# 3. Jalankan aplikasi (dari folder build atau Applications)
+open "build/MacPorts Control Center.app"
+# atau: open -a "MacPorts Control Center"
+
+# 4. Jalankan rangkaian unit test suite (42/42 tests passing)
 TEST_RUNNER=1 /tmp/run-all-tests
 ```
 

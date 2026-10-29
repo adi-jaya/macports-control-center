@@ -143,15 +143,17 @@ Konsultasikan dokumen berikut hanya saat pemicu (*trigger*) yang relevan aktif:
 1. **Build App Bundle Release:**
    ```bash
    ./build-app.sh
+   # Atau langsung pasang ke /Applications:
+   ./build-app.sh --install
    ```
-   Wajib menghasilkan bundel aplikasi bertanda tangan ad-hoc di `build/MacPorts Control Center.app` berukuran ~4.2 MB dengan verifikasi codesign sukses.
+   Wajib menghasilkan bundel aplikasi bertanda tangan ad-hoc di `build/MacPorts Control Center.app` (dan di `/Applications/` jika memakai `--install`) berukuran ~4.2 MB dengan verifikasi codesign sukses.
 2. **Jalankan Unit Test Suite:**
    ```bash
    TEST_RUNNER=1 /tmp/run-all-tests
    ```
    Wajib menghasilkan seluruh 42/42 pengujian unit lulus (AppState, CommandRunner, ConfigFileService, DoctorAndDatabase, MacPortsService).
 3. **Completion Criterion:**
-   - Bundel aplikasi valid dan dapat dijalankan: `open "build/MacPorts Control Center.app"`
+   - Bundel aplikasi valid dan dapat dijalankan: `open "build/MacPorts Control Center.app"` atau `open -a "MacPorts Control Center"`
    - Seluruh test suite lulus tanpa kegagalan (exit code 0).
 
 ### 📋 SOP 5: Kustomisasi Icon Aplikasi & Resource Bundel
