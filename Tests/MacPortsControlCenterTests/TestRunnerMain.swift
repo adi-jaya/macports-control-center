@@ -67,7 +67,11 @@ struct TestRunnerMain {
         await cmdTests.testCoalescedStreamingPreservesAllLinesImmediatelyUponReturn()
         cmdTests.tearDown()
 
-        print("All CommandRunnerTests passed successfully (9/9 tests)")
+        cmdTests.setUp()
+        cmdTests.testStreamCollectorFinishSplitsMultiLineRemainingData()
+        cmdTests.tearDown()
+
+        print("All CommandRunnerTests passed successfully (10/10 tests)")
 
         print("Running ConfigFileServiceTests...")
         let configTests = ConfigFileServiceTests()

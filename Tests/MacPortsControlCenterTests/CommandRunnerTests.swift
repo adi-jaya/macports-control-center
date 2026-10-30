@@ -130,4 +130,16 @@ final class CommandRunnerTests: XCTestCase {
         XCTAssertEqual(runner.terminalLines.last, "row-300")
         XCTAssertEqual(runner.terminalLines.count, 301)
     }
+
+    func testStreamCollectorFinishSplitsMultiLineRemainingData() {
+        let collector = StreamCollector(splitLines: true)
+        let finished = collector.finish(remainingData: Data("alpha\nbeta\ngamma".utf8))
+        XCTAssertEqual(finished.finalLines, ["alpha", "beta", "gamma"])
+        XCTAssertEqual(finished.output, "alpha\nbeta\ngamma")
+
+        let collectorWithTrailingNewline = StreamCollector(splitLines: true)
+        let finished2 = collectorWithTrailingNewline.finish(remainingData: Data("one\r\ntwo\nthree\n".utf8))
+        XCTAssertEqual(finished2.finalLines, ["one", "two", "three"])
+        XCTAssertEqual(finished2.output, "one\r\ntwo\nthree\n")
+    }
 }

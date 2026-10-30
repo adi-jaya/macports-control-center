@@ -11,16 +11,7 @@ final class StreamCollector: @unchecked Sendable {
         self.splitLines = splitLines
     }
 
-    func appendData(_ data: Data) -> [String] {
-        guard !data.isEmpty else { return [] }
-        lock.lock()
-        defer { lock.unlock() }
-
-        allBytes.append(data)
-        guard splitLines else { return [] }
-
-        byteBuffer.append(data)
-
+    private func scanLinesLocked() -> [String] {
         var lines: [String] = []
         let newlineByte = UInt8(ascii: "\n")
         let crByte = UInt8(ascii: "\r")
@@ -54,6 +45,18 @@ final class StreamCollector: @unchecked Sendable {
         return lines
     }
 
+    func appendData(_ data: Data) -> [String] {
+        guard !data.isEmpty else { return [] }
+        lock.lock()
+        defer { lock.unlock() }
+
+        allBytes.append(data)
+        guard splitLines else { return [] }
+
+        byteBuffer.append(data)
+        return scanLinesLocked()
+    }
+
     func finish(remainingData: Data? = nil) -> (output: String, finalLines: [String]) {
         lock.lock()
         defer { lock.unlock() }
@@ -66,16 +69,19 @@ final class StreamCollector: @unchecked Sendable {
         }
 
         var lines: [String] = []
-        if splitLines && !byteBuffer.isEmpty {
-            var remaining = byteBuffer
-            if let lastByte = remaining.last, lastByte == UInt8(ascii: "\r") {
-                remaining = remaining.dropLast()
+        if splitLines {
+            lines.append(contentsOf: scanLinesLocked())
+            if !byteBuffer.isEmpty {
+                var remaining = byteBuffer
+                if let lastByte = remaining.last, lastByte == UInt8(ascii: "\r") {
+                    remaining = remaining.dropLast()
+                }
+                let str = String(decoding: remaining, as: UTF8.self)
+                if !str.isEmpty {
+                    lines.append(str)
+                }
+                byteBuffer = Data()
             }
-            let str = String(decoding: remaining, as: UTF8.self)
-            if !str.isEmpty {
-                lines.append(str)
-            }
-            byteBuffer = Data()
         }
 
         let output = String(decoding: allBytes, as: UTF8.self)
@@ -130,14 +136,12 @@ public final class CommandRunner: ObservableObject {
     private var activeProcesses: [UUID: (process: Process, label: String)] = [:]
     private var queueTail: Task<Void, Never>? = nil
     private var queueTailToken: UUID? = nil
-    private var pendingLines: [String] = []
     private let maxTerminalLines = 5000
 
     public init() {}
 
     public func clearLog() {
         terminalLines.removeAll()
-        pendingLines.removeAll()
         terminalGeneration += 1
     }
 
