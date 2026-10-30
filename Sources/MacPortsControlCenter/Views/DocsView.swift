@@ -10,6 +10,15 @@ public struct MarkdownStyler {
         let color: NSColor
     }
 
+    private struct CacheEntry {
+        let length: Int
+        let hash: Int
+        let rendered: NSAttributedString
+    }
+
+    private static let cacheLock = NSLock()
+    private static var cache: [String: CacheEntry] = [:]
+
     private static let alertTypes: [AlertType] = [
         AlertType(tag: "[!note]", icon: "📘", title: "NOTE", color: NSColor.systemBlue),
         AlertType(tag: "[!tip]", icon: "💡", title: "TIP", color: NSColor.systemGreen),
@@ -18,7 +27,38 @@ public struct MarkdownStyler {
         AlertType(tag: "[!caution]", icon: "🔥", title: "CAUTION", color: NSColor.systemRed)
     ]
 
+    private static let orderedListRegex = try! NSRegularExpression(pattern: #"^(\d+\.)\s+(.*)$"#)
+    private static let brTagRegex = try! NSRegularExpression(pattern: #"<br\s*/?>"#, options: [.caseInsensitive])
+
+    public static func clearCache() {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        cache.removeAll()
+    }
+
+    public static func cachedStyle(for key: String, markdown: String) -> NSAttributedString {
+        let length = markdown.utf8.count
+        let hash = markdown.hashValue
+
+        cacheLock.lock()
+        if let entry = cache[key], entry.length == length, entry.hash == hash {
+            let rendered = entry.rendered
+            cacheLock.unlock()
+            return rendered
+        }
+        cacheLock.unlock()
+
+        let rendered = style(markdown)
+
+        cacheLock.lock()
+        cache[key] = CacheEntry(length: length, hash: hash, rendered: rendered)
+        cacheLock.unlock()
+
+        return rendered
+    }
+
     private static func decodeHTMLEntities(_ raw: String) -> String {
+        guard raw.contains("&") else { return raw }
         var text = raw
         let entities = [
             ("&rarr;", "→"),
@@ -37,8 +77,16 @@ public struct MarkdownStyler {
 
     private static func cleanCellText(_ raw: String) -> String {
         var text = decodeHTMLEntities(raw)
-        text = text.replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: .regularExpression)
+        if text.contains("<") {
+            let mutable = NSMutableString(string: text)
+            brTagRegex.replaceMatches(in: mutable, range: NSRange(location: 0, length: mutable.length), withTemplate: "\n")
+            text = mutable as String
+        }
         return text.trimmingCharacters(in: .whitespaces)
+    }
+
+    private static func hasInlineSyntax(_ s: String) -> Bool {
+        s.utf8.contains { $0 == 96 || $0 == 42 || $0 == 95 || $0 == 91 || $0 == 126 || $0 == 92 }
     }
 
     private static func computePercentages(rows: [[String]], numCols: Int) -> [CGFloat] {
@@ -74,6 +122,13 @@ public struct MarkdownStyler {
 
         func formatCellMarkdown(_ text: String, baseFont: NSFont, baseColor: NSColor, style: NSParagraphStyle) -> NSAttributedString {
             let processed = decodeHTMLEntities(text)
+            guard hasInlineSyntax(processed) else {
+                return NSAttributedString(string: (processed.isEmpty ? " " : processed) + "\n", attributes: [
+                    .font: baseFont,
+                    .foregroundColor: baseColor,
+                    .paragraphStyle: style
+                ])
+            }
             if let inlineAttr = try? AttributedString(markdown: processed, options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
                 let mutable = NSMutableAttributedString(inlineAttr)
                 let fullRange = NSRange(location: 0, length: mutable.length)
@@ -221,6 +276,14 @@ public struct MarkdownStyler {
 
         func appendInlineMarkdown(_ text: String, baseFont: NSFont = NSFont.systemFont(ofSize: 13), baseColor: NSColor = NSColor.textColor, style: NSParagraphStyle) {
             let processedText = decodeHTMLEntities(text)
+            guard hasInlineSyntax(processedText) else {
+                result.append(NSAttributedString(string: processedText + "\n", attributes: [
+                    .font: baseFont,
+                    .foregroundColor: baseColor,
+                    .paragraphStyle: style
+                ]))
+                return
+            }
             if let inlineAttr = try? AttributedString(markdown: processedText, options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
                 let mutableInline = NSMutableAttributedString(inlineAttr)
                 let fullRange = NSRange(location: 0, length: mutableInline.length)
@@ -410,7 +473,7 @@ public struct MarkdownStyler {
             if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("+ ") {
                 listPrefix = "• "
                 listContent = String(trimmed.dropFirst(2))
-            } else if let numMatch = try? NSRegularExpression(pattern: #"^(\d+\.)\s+(.*)$"#).firstMatch(in: trimmed, range: NSRange(location: 0, length: (trimmed as NSString).length)) {
+            } else if let numMatch = orderedListRegex.firstMatch(in: trimmed, range: NSRange(location: 0, length: (trimmed as NSString).length)) {
                 let ns = trimmed as NSString
                 listPrefix = ns.substring(with: numMatch.range(at: 1)) + " "
                 listContent = ns.substring(with: numMatch.range(at: 2))
@@ -488,9 +551,11 @@ public final class DocsScrollView: NSScrollView {
 
 // MARK: - MarkdownTextViewRepresentable
 public struct MarkdownTextViewRepresentable: NSViewRepresentable {
+    public let docKey: String
     public let markdownText: String
 
-    public init(markdownText: String) {
+    public init(docKey: String = "inline", markdownText: String) {
+        self.docKey = docKey
         self.markdownText = markdownText
     }
 
@@ -544,14 +609,14 @@ public struct MarkdownTextViewRepresentable: NSViewRepresentable {
         let widthChanged = (abs(context.coordinator.lastWidth - nsView.contentSize.width) > 1.0)
 
         if needsTextUpdate {
-            let rendered = MarkdownStyler.style(markdownText)
+            let rendered = MarkdownStyler.cachedStyle(for: docKey, markdown: markdownText)
             context.coordinator.currentText = markdownText
             context.coordinator.cachedAttributedString = rendered
             textView.textStorage?.setAttributedString(rendered)
             textView.scroll(NSPoint.zero)
         }
 
-        if needsTextUpdate || widthChanged {
+        if widthChanged {
             context.coordinator.lastWidth = nsView.contentSize.width
             if let layoutManager = textView.layoutManager, let textContainer = textView.textContainer {
                 let contentWidth = max(100.0, nsView.contentSize.width)
@@ -622,7 +687,10 @@ public struct DocsView: View {
                     }
 
                     // Native Markdown Reader (NSTextView)
-                    MarkdownTextViewRepresentable(markdownText: appState.selectedDocContent)
+                    MarkdownTextViewRepresentable(
+                        docKey: currentDoc.filePath,
+                        markdownText: appState.selectedDocContent
+                    )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     VStack(spacing: 12) {
@@ -642,6 +710,7 @@ public struct DocsView: View {
             if appState.selectedDoc == nil, let first = appState.docFiles.first {
                 appState.selectDoc(first)
             }
+            appState.ensureSelectedDocLoaded()
         }
     }
 

@@ -251,7 +251,19 @@ struct TestRunnerMain {
         await appStateTests.testAutoExpandDrawerOnMutationAndQuietPollingIsolation()
         appStateTests.tearDown()
 
-        print("All AppStateTests passed successfully (19/19 tests)")
+        appStateTests.setUp()
+        do {
+            try appStateTests.testLogFileTailerAdvancesToCleanNewlineBoundaryOnLargeUTF8File()
+        } catch {
+            fatalError("testLogFileTailerAdvancesToCleanNewlineBoundaryOnLargeUTF8File failed: \(error)")
+        }
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        appStateTests.testMarkdownStylerCacheHitAndClear()
+        appStateTests.tearDown()
+
+        print("All AppStateTests passed successfully (21/21 tests)")
     }
 }
 #endif

@@ -1,6 +1,11 @@
 import SwiftUI
 import AppKit
 
+// MARK: - Notifications
+public extension Notification.Name {
+    static let mpccMainWindowDidClose = Notification.Name("mpccMainWindowDidClose")
+}
+
 // MARK: - LogTypeTab
 public enum LogTypeTab: String, CaseIterable, Identifiable {
     case nginxError = "Nginx error.log"
@@ -73,21 +78,313 @@ public struct LogsTextViewRepresentable: NSViewRepresentable {
     }
 }
 
+// MARK: - LogFileTailer
+@MainActor
+public final class LogFileTailer: ObservableObject {
+    @Published public var logContent: String = ""
+    @Published public var displayedLogText: String = ""
+    @Published public var isLogUnreadable: Bool = false
+    @Published public var logFileSize: String = "0 B"
+    @Published public var isAutoTailEnabled: Bool = true {
+        didSet {
+            if isAutoTailEnabled != oldValue {
+                if isAutoTailEnabled {
+                    attachWatcher()
+                } else {
+                    stopSourceOnly()
+                }
+            }
+        }
+    }
+
+    private var activePath: String = ""
+    private var filterQuery: String = ""
+    private var filterTask: Task<Void, Never>? = nil
+    private var lastInode: UInt64 = 0
+    private var lastSize: UInt64 = 0
+    private var lastModDate: Date = .distantPast
+
+    private var fileSource: DispatchSourceFileSystemObject? = nil
+    private var watchedFD: Int32 = -1
+    private var missingFileTimer: Timer? = nil
+    private var windowCloseObserver: NSObjectProtocol? = nil
+
+    public init() {
+        windowCloseObserver = NotificationCenter.default.addObserver(
+            forName: .mpccMainWindowDidClose,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.stopWatching()
+            }
+        }
+    }
+
+    deinit {
+        if let obs = windowCloseObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+    }
+
+    public static func readTail(atPath path: String, maxBytes: UInt64 = 250 * 1024) -> (content: String, fileSize: Int64, isUnreadable: Bool, exists: Bool) {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: path) else {
+            return ("", 0, false, false)
+        }
+        guard fm.isReadableFile(atPath: path) else {
+            return ("", 0, true, true)
+        }
+
+        let fileSize = (try? fm.attributesOfItem(atPath: path)[.size] as? Int64) ?? 0
+
+        guard let fileHandle = FileHandle(forReadingAtPath: path) else {
+            if let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+                let content = String(decoding: data, as: UTF8.self)
+                return (content, fileSize, false, true)
+            }
+            return ("", fileSize, true, true)
+        }
+        defer { try? fileHandle.close() }
+
+        let totalSize = UInt64(max(0, fileSize))
+        let seekOffset: UInt64
+        if totalSize > maxBytes {
+            seekOffset = totalSize - maxBytes
+        } else {
+            seekOffset = 0
+        }
+
+        fileHandle.seek(toFileOffset: seekOffset)
+        var data = fileHandle.readDataToEndOfFile()
+
+        if seekOffset > 0, let nl = data.firstIndex(of: UInt8(ascii: "\n")) {
+            data = data.suffix(from: data.index(after: nl))
+        }
+
+        let content = String(decoding: data, as: UTF8.self)
+        return (content, fileSize, false, true)
+    }
+
+    public func startWatching(path: String) {
+        if self.activePath != path {
+            stopWatching()
+            self.activePath = path
+            self.lastInode = 0
+            self.lastSize = 0
+            self.lastModDate = .distantPast
+        }
+
+        reloadLog(force: true)
+
+        guard isAutoTailEnabled else { return }
+        attachWatcher()
+    }
+
+    public func stopWatching() {
+        stopSourceOnly()
+        stopMissingFileTimer()
+        filterTask?.cancel()
+        filterTask = nil
+    }
+
+    public func reloadLog(force: Bool = false) {
+        let path = activePath
+        guard !path.isEmpty else {
+            self.logContent = ""
+            self.displayedLogText = ""
+            self.isLogUnreadable = false
+            self.logFileSize = "0 B"
+            return
+        }
+
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: path) else {
+            self.lastInode = 0
+            self.lastSize = 0
+            self.lastModDate = .distantPast
+            self.logContent = ""
+            self.displayedLogText = ""
+            self.isLogUnreadable = false
+            self.logFileSize = "0 B"
+            return
+        }
+
+        guard fm.isReadableFile(atPath: path) else {
+            self.lastInode = 0
+            self.lastSize = 0
+            self.lastModDate = .distantPast
+            self.logContent = ""
+            self.displayedLogText = ""
+            self.isLogUnreadable = true
+            self.logFileSize = "Restricted"
+            return
+        }
+
+        self.isLogUnreadable = false
+
+        if let attrs = try? fm.attributesOfItem(atPath: path) {
+            let inode = (attrs[.systemFileNumber] as? NSNumber)?.uint64Value ?? 0
+            let size = (attrs[.size] as? NSNumber)?.uint64Value ?? 0
+            let mtime = (attrs[.modificationDate] as? Date) ?? .distantPast
+
+            if !force && inode == lastInode && size == lastSize && mtime == lastModDate {
+                return
+            }
+
+            self.lastInode = inode
+            self.lastSize = size
+            self.lastModDate = mtime
+        }
+
+        let tail = Self.readTail(atPath: path)
+        if tail.isUnreadable {
+            self.isLogUnreadable = true
+            self.logContent = ""
+            self.displayedLogText = ""
+            self.logFileSize = "Restricted"
+            return
+        }
+
+        self.isLogUnreadable = false
+        self.logContent = tail.content
+        self.logFileSize = ByteCountFormatter.string(fromByteCount: tail.fileSize, countStyle: .file)
+        self.applyFilter()
+    }
+
+    public func setFilterQuery(_ query: String) {
+        self.filterQuery = query
+        filterTask?.cancel()
+        if query.isEmpty {
+            self.displayedLogText = self.logContent
+            return
+        }
+        filterTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            guard let self = self, !Task.isCancelled else { return }
+            self.applyFilter()
+        }
+    }
+
+    public func setAutoTailEnabled(_ enabled: Bool) {
+        self.isAutoTailEnabled = enabled
+    }
+
+    private func applyFilter() {
+        guard !filterQuery.isEmpty else {
+            self.displayedLogText = logContent
+            return
+        }
+        let lines = logContent.components(separatedBy: .newlines)
+        let filtered = lines.filter { $0.localizedCaseInsensitiveContains(filterQuery) }
+        self.displayedLogText = filtered.joined(separator: "\n")
+    }
+
+    private func attachWatcher() {
+        stopSourceOnly()
+        guard isAutoTailEnabled, !activePath.isEmpty else { return }
+
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: activePath), fm.isReadableFile(atPath: activePath) else {
+            startMissingFileTimer()
+            return
+        }
+
+        stopMissingFileTimer()
+
+        let fd = open(activePath, O_EVTONLY)
+        guard fd >= 0 else {
+            startMissingFileTimer()
+            return
+        }
+
+        self.watchedFD = fd
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.extend, .write, .attrib, .delete, .rename],
+            queue: .main
+        )
+
+        source.setEventHandler { [weak self] in
+            guard let self = self else { return }
+            let flags = source.data
+            if flags.contains(.delete) || flags.contains(.rename) {
+                self.reloadLog(force: true)
+                self.attachWatcher()
+            } else {
+                self.reloadLog(force: false)
+            }
+        }
+
+        source.setCancelHandler {
+            close(fd)
+        }
+
+        self.fileSource = source
+        source.resume()
+    }
+
+    private func stopSourceOnly() {
+        if let source = fileSource {
+            fileSource = nil
+            source.cancel()
+            watchedFD = -1
+        } else if watchedFD >= 0 {
+            close(watchedFD)
+            watchedFD = -1
+        }
+    }
+
+    private func startMissingFileTimer() {
+        guard missingFileTimer == nil else { return }
+        let timer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                let fm = FileManager.default
+                if fm.fileExists(atPath: self.activePath) && fm.isReadableFile(atPath: self.activePath) {
+                    self.reloadLog(force: true)
+                    self.attachWatcher()
+                }
+            }
+        }
+        RunLoop.current.add(timer, forMode: .common)
+        self.missingFileTimer = timer
+    }
+
+    private func stopMissingFileTimer() {
+        missingFileTimer?.invalidate()
+        missingFileTimer = nil
+    }
+}
+
 // MARK: - LogsView
 public struct LogsView: View {
     @EnvironmentObject public var appState: AppState
 
+    @StateObject private var tailer = LogFileTailer()
     @State private var selectedTab: LogTypeTab = .nginxError
     @State private var selectedPHPVersion: String = "83"
-    @State private var logContent: String = ""
     @State private var filterQuery: String = ""
-    @State private var isAutoTailEnabled: Bool = true
-    @State private var isLogUnreadable: Bool = false
-    @State private var logFileSize: String = "0 B"
     @State private var feedbackMessage: String? = nil
-    @State private var timerSubscription: Timer? = nil
+    @State private var cachedMariaDBPath: String = ""
 
     public init() {}
+
+    private func resolveMariaDBPath() -> String {
+        let hostName = ProcessInfo.processInfo.hostName
+        let candidates = [
+            "/opt/local/var/log/mariadb-10.11/mariadb.err",
+            "/opt/local/var/db/mariadb-10.11/\(hostName).err",
+            "/opt/local/var/log/mariadb/error.log",
+            "/opt/local/var/db/mariadb-10.11/error.log"
+        ]
+        for path in candidates {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+        return "/opt/local/var/log/mariadb-10.11/mariadb.err"
+    }
 
     private var activeLogPath: String {
         switch selectedTab {
@@ -98,28 +395,8 @@ public struct LogsView: View {
         case .phpFpm:
             return "/opt/local/var/log/php\(selectedPHPVersion)/php-fpm.log"
         case .mariaDB:
-            // Check known candidate paths
-            let hostName = ProcessInfo.processInfo.hostName
-            let candidates = [
-                "/opt/local/var/log/mariadb-10.11/mariadb.err",
-                "/opt/local/var/db/mariadb-10.11/\(hostName).err",
-                "/opt/local/var/log/mariadb/error.log",
-                "/opt/local/var/db/mariadb-10.11/error.log"
-            ]
-            for path in candidates {
-                if FileManager.default.fileExists(atPath: path) {
-                    return path
-                }
-            }
-            return "/opt/local/var/log/mariadb-10.11/mariadb.err"
+            return cachedMariaDBPath.isEmpty ? "/opt/local/var/log/mariadb-10.11/mariadb.err" : cachedMariaDBPath
         }
-    }
-
-    private var filteredLogText: String {
-        guard !filterQuery.isEmpty else { return logContent }
-        let lines = logContent.components(separatedBy: .newlines)
-        let filtered = lines.filter { $0.localizedCaseInsensitiveContains(filterQuery) }
-        return filtered.joined(separator: "\n")
     }
 
     public var body: some View {
@@ -130,7 +407,7 @@ public struct LogsView: View {
             Divider()
 
             // 1-Click Stack Doctor Permission Banner if unreadable
-            if isLogUnreadable {
+            if tailer.isLogUnreadable {
                 unreadablePermissionBanner
             }
 
@@ -153,7 +430,7 @@ public struct LogsView: View {
 
             // Log Text Viewer Area
             ZStack(alignment: .bottomTrailing) {
-                if logContent.isEmpty && !isLogUnreadable {
+                if tailer.logContent.isEmpty && !tailer.isLogUnreadable {
                     VStack(spacing: 10) {
                         Image(systemName: "doc.text")
                             .font(.system(size: 32))
@@ -169,14 +446,14 @@ public struct LogsView: View {
                     .background(Color(NSColor(red: 2/255.0, green: 6/255.0, blue: 23/255.0, alpha: 1.0)))
                 } else {
                     LogsTextViewRepresentable(
-                        text: filteredLogText,
-                        autoScroll: isAutoTailEnabled
+                        text: tailer.displayedLogText,
+                        autoScroll: tailer.isAutoTailEnabled
                     )
                 }
 
                 // Floating Info Badge
                 HStack(spacing: 8) {
-                    if isAutoTailEnabled {
+                    if tailer.isAutoTailEnabled {
                         Circle()
                             .fill(Color.green)
                             .frame(width: 6, height: 6)
@@ -184,7 +461,7 @@ public struct LogsView: View {
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(.green)
                     }
-                    Text(logFileSize)
+                    Text(tailer.logFileSize)
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundColor(.secondary)
                 }
@@ -197,17 +474,22 @@ public struct LogsView: View {
         }
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear {
-            reloadLog()
-            startAutoTailTimer()
+            if selectedTab == .mariaDB {
+                cachedMariaDBPath = resolveMariaDBPath()
+            }
+            tailer.startWatching(path: activeLogPath)
         }
         .onDisappear {
-            stopAutoTailTimer()
+            tailer.stopWatching()
         }
-        .onChange(of: selectedTab) { _ in
-            reloadLog()
+        .onChange(of: selectedTab) { newTab in
+            if newTab == .mariaDB {
+                cachedMariaDBPath = resolveMariaDBPath()
+            }
+            tailer.startWatching(path: activeLogPath)
         }
         .onChange(of: selectedPHPVersion) { _ in
-            reloadLog()
+            tailer.startWatching(path: activeLogPath)
         }
     }
 
@@ -241,14 +523,14 @@ public struct LogsView: View {
                 Spacer()
 
                 // Actions: Auto-tail toggle, Refresh, Clear, Copy
-                Toggle(isOn: $isAutoTailEnabled) {
+                Toggle(isOn: $tailer.isAutoTailEnabled) {
                     Text("Auto-Tail")
                         .font(.system(size: 11))
                 }
                 .toggleStyle(.checkbox)
 
                 Button(action: {
-                    reloadLog()
+                    tailer.reloadLog(force: true)
                 }) {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 11))
@@ -298,8 +580,14 @@ public struct LogsView: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
                         .frame(width: 180)
+                        .onChange(of: filterQuery) { query in
+                            tailer.setFilterQuery(query)
+                        }
                     if !filterQuery.isEmpty {
-                        Button(action: { filterQuery = "" }) {
+                        Button(action: {
+                            filterQuery = ""
+                            tailer.setFilterQuery("")
+                        }) {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 9))
                                 .foregroundColor(.secondary)
@@ -341,7 +629,7 @@ public struct LogsView: View {
             Button(action: {
                 Task {
                     await appState.runDoctorAutoFix()
-                    reloadLog()
+                    tailer.reloadLog(force: true)
                     feedbackMessage = "Permissions repaired via Stack Doctor."
                 }
             }) {
@@ -367,78 +655,18 @@ public struct LogsView: View {
     }
 
     // MARK: - Log Operations
-    private func reloadLog() {
-        let path = activeLogPath
-        let fm = FileManager.default
-
-        guard fm.fileExists(atPath: path) else {
-            self.logContent = ""
-            self.isLogUnreadable = false
-            self.logFileSize = "0 B"
-            return
-        }
-
-        // Check readability
-        guard fm.isReadableFile(atPath: path) else {
-            self.isLogUnreadable = true
-            self.logContent = ""
-            self.logFileSize = "Restricted"
-            return
-        }
-
-        self.isLogUnreadable = false
-
-        // Fetch file size
-        if let attrs = try? fm.attributesOfItem(atPath: path),
-           let size = attrs[.size] as? Int64 {
-            self.logFileSize = ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
-        }
-
-        // Read last 250 KB if file is very large
-        let maxBytesToRead: UInt64 = 250 * 1024
-        if let fileHandle = FileHandle(forReadingAtPath: path) {
-            defer { try? fileHandle.close() }
-            let fileSize = fileHandle.seekToEndOfFile()
-            if fileSize > maxBytesToRead {
-                fileHandle.seek(toFileOffset: fileSize - maxBytesToRead)
-            } else {
-                fileHandle.seek(toFileOffset: 0)
-            }
-            let data = fileHandle.readDataToEndOfFile()
-            self.logContent = String(decoding: data, as: UTF8.self)
-        } else if let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
-            self.logContent = String(decoding: data, as: UTF8.self)
-        }
-    }
-
     private func clearLogFile() {
         let path = activeLogPath
         Task {
             _ = await appState.commandRunner.runShell("echo -n '' > '\(path)' 2>/dev/null || sudo -n sh -c '> \"\(path)\"'", label: "clear-\(selectedTab.rawValue)")
-            reloadLog()
+            tailer.reloadLog(force: true)
             feedbackMessage = "Cleared \(selectedTab.rawValue)."
         }
     }
 
     private func copyToClipboard() {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(filteredLogText, forType: .string)
+        NSPasteboard.general.setString(tailer.displayedLogText, forType: .string)
         feedbackMessage = "Copied \(selectedTab.rawValue) to clipboard."
-    }
-
-    private func startAutoTailTimer() {
-        stopAutoTailTimer()
-        let timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-            if isAutoTailEnabled {
-                reloadLog()
-            }
-        }
-        RunLoop.current.add(timer, forMode: .common)
-        timerSubscription = timer
-    }
-
-    private func stopAutoTailTimer() {
-        timerSubscription?.invalidate()
-        timerSubscription = nil
     }
 }

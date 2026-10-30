@@ -356,4 +356,37 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(state.docFiles.isEmpty)
         XCTAssertNotNil(state.selectedDoc)
     }
+
+    func testLogFileTailerAdvancesToCleanNewlineBoundaryOnLargeUTF8File() throws {
+        let tempFile = (NSTemporaryDirectory() as NSString).appendingPathComponent("utf8_log_\(UUID().uuidString).log")
+        defer { try? FileManager.default.removeItem(atPath: tempFile) }
+
+        var payload = ""
+        for i in 0..<40 {
+            payload += "2026-10-30 [error] 🚀 baris-log-panjang-ke-\(i)\n"
+        }
+        try payload.write(toFile: tempFile, atomically: true, encoding: .utf8)
+
+        // Small maxBytes cuts into the middle of a multi-byte UTF-8 line
+        let tail = LogFileTailer.readTail(atPath: tempFile, maxBytes: 220)
+        XCTAssertTrue(tail.exists)
+        XCTAssertFalse(tail.isUnreadable)
+        XCTAssertTrue(tail.content.hasPrefix("2026-10-30 [error] 🚀 baris-log-panjang-ke-"), "Tail must start cleanly at the next full line")
+        XCTAssertFalse(tail.content.contains("\u{FFFD}"), "Tail must never contain replacement characters from sliced UTF-8")
+
+        // File smaller than maxBytes keeps the very first line intact
+        let full = LogFileTailer.readTail(atPath: tempFile, maxBytes: 100_000)
+        XCTAssertTrue(full.content.hasPrefix("2026-10-30 [error] 🚀 baris-log-panjang-ke-0\n"))
+    }
+
+    func testMarkdownStylerCacheHitAndClear() {
+        MarkdownStyler.clearCache()
+        let md = "# Title\nPlain paragraph without inline markers.\n| A | B |\n|---|---|\n| plain | **bold** |"
+        let first = MarkdownStyler.cachedStyle(for: "doc-test", markdown: md)
+        let second = MarkdownStyler.cachedStyle(for: "doc-test", markdown: md)
+        XCTAssertTrue(first === second, "cachedStyle must return identical NSAttributedString instance on cache hit")
+        MarkdownStyler.clearCache()
+        let third = MarkdownStyler.cachedStyle(for: "doc-test", markdown: md)
+        XCTAssertFalse(first === third, "clearCache must evict cached NSAttributedString instances")
+    }
 }
