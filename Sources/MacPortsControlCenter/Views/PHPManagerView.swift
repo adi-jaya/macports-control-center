@@ -87,7 +87,19 @@ public struct PHPManagerView: View {
     }
 
     private func syncTuningWithSelection() {
-        tuning = appState.loadQuickTuning(version: selectedVersion)
+        let version = selectedVersion
+        Task.detached(priority: .userInitiated) {
+            let v = version.replacingOccurrences(of: ".", with: "")
+            let phpIniPath = "/opt/local/etc/php\(v)/php.ini"
+            let phpIniContent = (try? String(contentsOfFile: phpIniPath, encoding: .utf8)) ?? ""
+            let nginxConfContent = (try? String(contentsOfFile: "/opt/local/etc/nginx/nginx.conf", encoding: .utf8)) ?? ""
+            let loadedTuning = ConfigFileService.parsePHPIniTuning(phpIniContent: phpIniContent, nginxConfContent: nginxConfContent)
+            await MainActor.run {
+                if self.selectedVersion == version {
+                    self.tuning = loadedTuning
+                }
+            }
+        }
     }
 
     // MARK: - Header
@@ -106,8 +118,19 @@ public struct PHPManagerView: View {
             HStack(spacing: 8) {
                 Button(action: {
                     Task {
-                        for php in appState.phpVersions where php.isInstalled {
-                            _ = await appState.commandRunner.runShell("sudo -n /opt/local/bin/port reload \(php.portName)-fpm || sudo -n /opt/local/bin/port load \(php.portName)-fpm", label: "restart-\(php.portName)-fpm")
+                        let installed = appState.phpVersions.filter { $0.isInstalled }
+                        guard !installed.isEmpty else { return }
+                        if installed.allSatisfy({ $0.isFPMRunning }) {
+                            let targets = installed.map { "\($0.portName)-fpm" }.joined(separator: " ")
+                            _ = await appState.commandRunner.runShell("sudo -n /opt/local/bin/port reload \(targets)", label: "reload-all-fpm")
+                        } else {
+                            for php in installed {
+                                if php.isFPMRunning {
+                                    _ = await appState.commandRunner.runShell("sudo -n /opt/local/bin/port reload \(php.portName)-fpm", label: "reload-\(php.portName)-fpm")
+                                } else {
+                                    _ = await appState.commandRunner.runShell("sudo -n /opt/local/bin/port load \(php.portName)-fpm", label: "load-\(php.portName)-fpm")
+                                }
+                            }
                         }
                         await appState.refreshPHPVersions()
                         feedbackMessage = "Restarted all active PHP-FPM pools."

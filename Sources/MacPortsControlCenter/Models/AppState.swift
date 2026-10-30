@@ -230,6 +230,7 @@ public final class AppState: ObservableObject {
             packageSearchQuery = ""
             packages = []
         }
+        MarkdownStyler.clearCache()
     }
 
     // MARK: - Command Palette

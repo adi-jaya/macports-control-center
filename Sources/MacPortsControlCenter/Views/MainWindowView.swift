@@ -97,7 +97,6 @@ public struct MainWindowView: View {
                     .transition(.opacity)
             }
         }
-        .environmentObject(appState)
         .frame(minWidth: 920, minHeight: 620)
         // Hidden button to catch Cmd + K keyboard shortcut
         .background(

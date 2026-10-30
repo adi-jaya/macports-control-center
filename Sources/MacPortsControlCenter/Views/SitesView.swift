@@ -165,7 +165,7 @@ public struct SitesView: View {
                 .background(Color(NSColor.controlBackgroundColor))
                 .cornerRadius(8)
             } else {
-                VStack(spacing: 12) {
+                LazyVStack(spacing: 10) {
                     ForEach(appState.vhosts) { vhost in
                         vhostCard(vhost)
                     }

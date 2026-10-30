@@ -16,6 +16,8 @@ public struct PackagesView: View {
 
     @State private var searchInput: String = ""
     @State private var selectedFilter: PackageFilterTab = .all
+    @State private var visibleLimit: Int = 200
+    @State private var searchTask: Task<Void, Never>? = nil
     @State private var isSelectGroupsExpanded: Bool = true
     @State private var packageToUninstall: PortPackageItem? = nil
     @State private var isUninstallAlertPresented: Bool = false
@@ -97,6 +99,9 @@ public struct PackagesView: View {
                     await appState.refreshPortSelect()
                 }
             }
+        }
+        .onDisappear {
+            searchTask?.cancel()
         }
         .alert(isPresented: $isUninstallAlertPresented) {
             Alert(
@@ -313,7 +318,9 @@ public struct PackagesView: View {
                 if !searchInput.isEmpty {
                     Button(action: {
                         searchInput = ""
-                        Task { await appState.loadInstalledPackages() }
+                        searchTask?.cancel()
+                        visibleLimit = 200
+                        searchTask = Task { await appState.loadInstalledPackages() }
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 11))
@@ -346,12 +353,17 @@ public struct PackagesView: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 240)
+            .onChange(of: selectedFilter) { _ in
+                visibleLimit = 200
+            }
         }
     }
 
     private func triggerSearch() {
+        searchTask?.cancel()
+        visibleLimit = 200
         let trimmed = searchInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        Task {
+        searchTask = Task {
             if trimmed.isEmpty {
                 await appState.loadInstalledPackages()
             } else {
@@ -387,7 +399,9 @@ public struct PackagesView: View {
                     if !searchInput.isEmpty {
                         Button("Show Installed Packages") {
                             searchInput = ""
-                            Task { await appState.loadInstalledPackages() }
+                            searchTask?.cancel()
+                            visibleLimit = 200
+                            searchTask = Task { await appState.loadInstalledPackages() }
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -399,8 +413,24 @@ public struct PackagesView: View {
                 .cornerRadius(8)
             } else {
                 LazyVStack(spacing: 8) {
-                    ForEach(filteredPackages) { package in
+                    ForEach(Array(filteredPackages.prefix(visibleLimit))) { package in
                         packageRow(package: package)
+                    }
+
+                    if filteredPackages.count > visibleLimit {
+                        Button(action: {
+                            visibleLimit += 200
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.down.circle")
+                                Text("Load More (\(filteredPackages.count - visibleLimit) remaining)")
+                            }
+                            .font(.system(size: 12, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.bordered)
+                        .padding(.top, 4)
                     }
                 }
             }

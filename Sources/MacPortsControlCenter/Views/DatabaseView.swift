@@ -18,7 +18,7 @@ public struct DatabaseView: View {
     public init() {}
 
     private var isSocketConnected: Bool {
-        DoctorService.isMySQLSocketPresent(path: appState.defaultSocketPath)
+        appState.isMySQLSocketConnected
     }
 
     private var isMariaDBRunning: Bool {
@@ -341,22 +341,8 @@ public struct DatabaseView: View {
     }
 
     private func isEngineInstalled(portName: String) -> Bool {
-        if appState.packages.contains(where: { $0.name == portName && $0.isInstalled }) {
-            return true
-        }
-        if appState.services.contains(where: { $0.name.contains(portName) || portName.contains($0.name) }) {
-            return true
-        }
-        if portName == "mariadb-10.11-server" {
-            return FileManager.default.fileExists(atPath: "/opt/local/etc/mariadb-10.11/my.cnf") ||
-                   FileManager.default.fileExists(atPath: "/opt/local/var/db/mariadb-10.11")
-        } else if portName == "mariadb-11.4-server" {
-            return FileManager.default.fileExists(atPath: "/opt/local/etc/mariadb-11.4/my.cnf") ||
-                   FileManager.default.fileExists(atPath: "/opt/local/var/db/mariadb-11.4")
-        } else if portName == "mysql8-server" {
-            return FileManager.default.fileExists(atPath: "/opt/local/etc/mysql8/my.cnf")
-        }
-        return false
+        appState.installedDatabaseEngines.contains(portName) ||
+            appState.services.contains(where: { $0.name.contains(portName) || portName.contains($0.name) })
     }
 
     private func isEngineActive(portName: String) -> Bool {
@@ -655,9 +641,7 @@ public struct CreateDatabaseSheet: View {
 
     private var isValidDbName: Bool {
         let trimmed = dbName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return false }
-        let regex = "^[a-zA-Z0-9_]+$"
-        return trimmed.range(of: regex, options: .regularExpression) != nil
+        return !trimmed.isEmpty && trimmed.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }
     }
 
     public var body: some View {

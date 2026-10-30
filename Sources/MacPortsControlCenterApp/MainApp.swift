@@ -29,27 +29,31 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
             button.title = " MP"
             button.imagePosition = .imageLeft
             button.toolTip = "MacPorts Control Center"
-            button.image = makeStatusIndicatorImage(color: .systemGray)
+            button.image = statusImages[.stopped]
         }
 
         let menu = NSMenu()
         menu.delegate = self
         menu.autoenablesItems = false
         statusItem.menu = menu
-        updateStatusIndicator()
+        applyStatusIndicator(currentStatus)
     }
 
     private func observeAppState() {
-        appState.objectWillChange
+        Publishers.CombineLatest3(appState.$services, appState.$isLoading, appState.commandRunner.$isRunning)
+            .map { services, isLoading, isRunning -> StackStatus in
+                Self.computeStatus(services: services, isLoading: isLoading, isRunning: isRunning)
+            }
+            .removeDuplicates()
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.updateStatusIndicator()
+            .sink { [weak self] status in
+                self?.applyStatusIndicator(status)
             }
             .store(in: &cancellables)
     }
 
     // MARK: - Status Computation
-    public enum StackStatus {
+    public enum StackStatus: String, CaseIterable, Equatable, Hashable {
         case running
         case degraded
         case stopped
@@ -74,14 +78,22 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    public var currentStatus: StackStatus {
-        if appState.isLoading || appState.commandRunner.isRunning {
+    private lazy var statusImages: [StackStatus: NSImage] = {
+        var dict: [StackStatus: NSImage] = [:]
+        for status in StackStatus.allCases {
+            dict[status] = Self.makeStatusIndicatorImage(color: status.color)
+        }
+        return dict
+    }()
+
+    public static func computeStatus(services: [ServiceItem], isLoading: Bool, isRunning: Bool) -> StackStatus {
+        if isLoading || isRunning {
             return .updating
         }
 
-        let isNginxRunning = appState.services.first(where: { $0.name == "nginx" })?.isRunning ?? false
-        let isPHPRunning = appState.services.contains(where: { $0.name.contains("php") && $0.name.contains("fpm") && $0.isRunning })
-        let isDBRunning = appState.services.contains(where: { ($0.name.contains("mariadb") || $0.name.contains("mysql")) && $0.isRunning })
+        let isNginxRunning = services.first(where: { $0.name == "nginx" })?.isRunning ?? false
+        let isPHPRunning = services.contains(where: { $0.name.contains("php") && $0.name.contains("fpm") && $0.isRunning })
+        let isDBRunning = services.contains(where: { ($0.name.contains("mariadb") || $0.name.contains("mysql")) && $0.isRunning })
 
         if isNginxRunning && isPHPRunning && isDBRunning {
             return .running
@@ -92,13 +104,20 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    private func updateStatusIndicator() {
-        let status = currentStatus
-        statusItem.button?.image = makeStatusIndicatorImage(color: status.color)
+    public var currentStatus: StackStatus {
+        Self.computeStatus(
+            services: appState.services,
+            isLoading: appState.isLoading,
+            isRunning: appState.commandRunner.isRunning
+        )
+    }
+
+    private func applyStatusIndicator(_ status: StackStatus) {
+        statusItem.button?.image = statusImages[status] ?? Self.makeStatusIndicatorImage(color: status.color)
         statusItem.button?.toolTip = "MacPorts Control Center — Web Stack: \(status.displayText)"
     }
 
-    private func makeStatusIndicatorImage(color: NSColor) -> NSImage {
+    private static func makeStatusIndicatorImage(color: NSColor) -> NSImage {
         let size = NSSize(width: 12, height: 12)
         let image = NSImage(size: size, flipped: false) { _ in
             let circleRect = NSRect(x: 1, y: 1, width: 10, height: 10)
@@ -124,7 +143,7 @@ public final class MenuBarController: NSObject, NSMenuDelegate {
         // 1. Status Summary Header
         let summaryItem = NSMenuItem(title: "Web Stack: \(status.displayText)", action: nil, keyEquivalent: "")
         summaryItem.isEnabled = false
-        summaryItem.image = makeStatusIndicatorImage(color: status.color)
+        summaryItem.image = statusImages[status] ?? Self.makeStatusIndicatorImage(color: status.color)
         menu.addItem(summaryItem)
 
         // Active Components Subtitle
@@ -245,6 +264,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         setupMainMenu()
 
         let state = AppState()
+        state.isTerminalDrawerExpanded = false
         self.appState = state
 
         self.menuBarController = MenuBarController(appState: state) { [weak self] in
@@ -279,7 +299,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     }
 
     public func showMainWindow() {
-        guard let window = mainWindow else { return }
+        guard let window = mainWindow else {
+            createAndShowMainWindow()
+            return
+        }
         NSApp.setActivationPolicy(.regular)
         if window.isMiniaturized {
             window.deminiaturize(nil)
@@ -289,7 +312,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
     }
 
     public func windowShouldClose(_ sender: NSWindow) -> Bool {
+        NotificationCenter.default.post(name: .mpccMainWindowDidClose, object: nil)
+        sender.saveFrame(usingName: "MacPortsControlCenterMainWindow")
+        sender.delegate = nil
+        sender.contentView = nil
         sender.orderOut(nil)
+        self.mainWindow = nil
+        self.appState.purgeTransientCachesForBackground()
+        // Keep NSApp.setActivationPolicy(.regular) so Dock icon stays visible!
         return false
     }
 
