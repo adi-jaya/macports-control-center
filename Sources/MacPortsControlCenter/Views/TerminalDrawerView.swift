@@ -3,10 +3,25 @@ import AppKit
 
 // MARK: - NSTextView Representable for Streamed Terminal Output
 public struct TerminalTextViewRepresentable: NSViewRepresentable {
-    public let text: String
+    public let lines: [String]
+    public let generation: Int
 
-    public init(text: String) {
-        self.text = text
+    public init(lines: [String], generation: Int) {
+        self.lines = lines
+        self.generation = generation
+    }
+
+    public class Coordinator {
+        var lastGeneration: Int = -1
+        var renderedLineCount: Int = 0
+        let defaultAttributes: [NSAttributedString.Key: Any] = [
+            .foregroundColor: NSColor(red: 226/255.0, green: 232/255.0, blue: 240/255.0, alpha: 1.0), // Slate-200 #E2E8F0
+            .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        ]
+    }
+
+    public func makeCoordinator() -> Coordinator {
+        Coordinator()
     }
 
     public func makeNSView(context: Context) -> NSScrollView {
@@ -42,9 +57,31 @@ public struct TerminalTextViewRepresentable: NSViewRepresentable {
     }
 
     public func updateNSView(_ nsView: NSScrollView, context: Context) {
-        guard let textView = nsView.documentView as? NSTextView else { return }
-        if textView.string != text {
-            textView.string = text
+        guard let textView = nsView.documentView as? NSTextView,
+              let textStorage = textView.textStorage else { return }
+
+        let coordinator = context.coordinator
+
+        if coordinator.lastGeneration != generation || lines.count < coordinator.renderedLineCount {
+            let fullText = lines.joined(separator: "\n")
+            let attributed = NSAttributedString(string: fullText, attributes: coordinator.defaultAttributes)
+            textStorage.setAttributedString(attributed)
+            coordinator.lastGeneration = generation
+            coordinator.renderedLineCount = lines.count
+            if !fullText.isEmpty {
+                textView.scrollToEndOfDocument(nil)
+            }
+        } else if lines.count > coordinator.renderedLineCount {
+            let newLines = lines[coordinator.renderedLineCount..<lines.count]
+            let prefix = coordinator.renderedLineCount > 0 ? "\n" : ""
+            let appendedText = prefix + newLines.joined(separator: "\n")
+            let attributed = NSAttributedString(string: appendedText, attributes: coordinator.defaultAttributes)
+
+            textStorage.beginEditing()
+            textStorage.append(attributed)
+            textStorage.endEditing()
+
+            coordinator.renderedLineCount = lines.count
             textView.scrollToEndOfDocument(nil)
         }
     }
@@ -142,7 +179,7 @@ public struct TerminalDrawerView: View {
 
             // Streamed Output Body
             if isExpanded {
-                TerminalTextViewRepresentable(text: runner.terminalLines.joined(separator: "\n"))
+                TerminalTextViewRepresentable(lines: runner.terminalLines, generation: runner.terminalGeneration)
                     .frame(minHeight: 120, maxHeight: 220)
                     .background(Color(red: 2/255.0, green: 6/255.0, blue: 23/255.0))
             }

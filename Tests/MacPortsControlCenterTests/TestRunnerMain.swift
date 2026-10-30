@@ -55,7 +55,19 @@ struct TestRunnerMain {
         await cmdTests.testCancelTerminatesAllActiveConcurrentProcesses()
         cmdTests.tearDown()
 
-        print("All CommandRunnerTests passed successfully (6/6 tests)")
+        cmdTests.setUp()
+        cmdTests.testStreamCollectorCursorScanAndSplitDisabledMode()
+        cmdTests.tearDown()
+
+        cmdTests.setUp()
+        await cmdTests.testQuietModeSkipsTerminalLinesAndIsRunningState()
+        cmdTests.tearDown()
+
+        cmdTests.setUp()
+        await cmdTests.testCoalescedStreamingPreservesAllLinesImmediatelyUponReturn()
+        cmdTests.tearDown()
+
+        print("All CommandRunnerTests passed successfully (9/9 tests)")
 
         print("Running ConfigFileServiceTests...")
         let configTests = ConfigFileServiceTests()

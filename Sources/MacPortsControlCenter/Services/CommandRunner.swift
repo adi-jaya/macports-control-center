@@ -5,6 +5,11 @@ final class StreamCollector: @unchecked Sendable {
     private let lock = NSLock()
     private var allBytes = Data()
     private var byteBuffer = Data()
+    private let splitLines: Bool
+
+    init(splitLines: Bool = true) {
+        self.splitLines = splitLines
+    }
 
     func appendData(_ data: Data) -> [String] {
         guard !data.isEmpty else { return [] }
@@ -12,35 +17,56 @@ final class StreamCollector: @unchecked Sendable {
         defer { lock.unlock() }
 
         allBytes.append(data)
+        guard splitLines else { return [] }
+
         byteBuffer.append(data)
 
         var lines: [String] = []
         let newlineByte = UInt8(ascii: "\n")
         let crByte = UInt8(ascii: "\r")
 
-        while let newlineIndex = byteBuffer.firstIndex(of: newlineByte) {
-            var lineData = byteBuffer[..<newlineIndex]
-            if let lastByte = lineData.last, lastByte == crByte {
-                lineData = lineData.dropLast()
+        var lineStart = 0
+        let count = byteBuffer.count
+
+        byteBuffer.withUnsafeBytes { rawBuffer in
+            guard let ptr = rawBuffer.bindMemory(to: UInt8.self).baseAddress else { return }
+            for i in 0..<count {
+                if ptr[i] == newlineByte {
+                    var lineEnd = i
+                    if lineEnd > lineStart && ptr[lineEnd - 1] == crByte {
+                        lineEnd -= 1
+                    }
+                    let lineData = Data(bytes: ptr + lineStart, count: lineEnd - lineStart)
+                    lines.append(String(decoding: lineData, as: UTF8.self))
+                    lineStart = i + 1
+                }
             }
-            lines.append(String(decoding: lineData, as: UTF8.self))
-            byteBuffer = Data(byteBuffer[(newlineIndex + 1)...])
+        }
+
+        if lineStart == 0 {
+            // No newlines found, keep byteBuffer as is
+        } else if lineStart < count {
+            byteBuffer = Data(byteBuffer[lineStart...])
+        } else {
+            byteBuffer = Data()
         }
 
         return lines
     }
 
-    func finish(remainingData: Data?) -> (output: String, finalLines: [String]) {
+    func finish(remainingData: Data? = nil) -> (output: String, finalLines: [String]) {
         lock.lock()
         defer { lock.unlock() }
 
         if let data = remainingData, !data.isEmpty {
             allBytes.append(data)
-            byteBuffer.append(data)
+            if splitLines {
+                byteBuffer.append(data)
+            }
         }
 
         var lines: [String] = []
-        if !byteBuffer.isEmpty {
+        if splitLines && !byteBuffer.isEmpty {
             var remaining = byteBuffer
             if let lastByte = remaining.last, lastByte == UInt8(ascii: "\r") {
                 remaining = remaining.dropLast()
@@ -54,6 +80,27 @@ final class StreamCollector: @unchecked Sendable {
 
         let output = String(decoding: allBytes, as: UTF8.self)
         return (output, lines)
+    }
+}
+
+// MARK: - Line Accumulator
+final class LineAccumulator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var buffer: [String] = []
+
+    func append(_ lines: [String]) {
+        guard !lines.isEmpty else { return }
+        lock.lock()
+        buffer.append(contentsOf: lines)
+        lock.unlock()
+    }
+
+    func drain() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        let current = buffer
+        buffer.removeAll(keepingCapacity: true)
+        return current
     }
 }
 
@@ -74,17 +121,24 @@ public struct CommandResult: Equatable, Sendable {
 @MainActor
 public final class CommandRunner: ObservableObject {
     @Published public private(set) var terminalLines: [String] = []
+    @Published public private(set) var terminalGeneration: Int = 0
     @Published public private(set) var isRunning: Bool = false
     @Published public private(set) var currentCommandLabel: String = ""
 
+    public var onMutationCommandStart: (() -> Void)? = nil
+
     private var activeProcesses: [UUID: (process: Process, label: String)] = [:]
     private var queueTail: Task<Void, Never>? = nil
+    private var queueTailToken: UUID? = nil
+    private var pendingLines: [String] = []
     private let maxTerminalLines = 5000
 
     public init() {}
 
     public func clearLog() {
         terminalLines.removeAll()
+        pendingLines.removeAll()
+        terminalGeneration += 1
     }
 
     public func cancelCurrentProcess() {
@@ -95,12 +149,18 @@ public final class CommandRunner: ObservableObject {
         }
     }
 
-    public func runShell(_ command: String, label: String, serialized: Bool = true) async -> CommandResult {
+    public func runShell(
+        _ command: String,
+        label: String,
+        serialized: Bool = true,
+        logToTerminal: Bool = true
+    ) async -> CommandResult {
         return await run(
             executable: "/bin/zsh",
             arguments: ["-c", command],
             label: label,
-            serialized: serialized
+            serialized: serialized,
+            logToTerminal: logToTerminal
         )
     }
 
@@ -109,67 +169,84 @@ public final class CommandRunner: ObservableObject {
         arguments: [String],
         label: String,
         serialized: Bool = true,
+        logToTerminal: Bool = true,
         onLine: ((String) -> Void)? = nil
     ) async -> CommandResult {
         if !serialized {
-            return await execute(executable: executable, arguments: arguments, label: label, onLine: onLine)
+            return await execute(
+                executable: executable,
+                arguments: arguments,
+                label: label,
+                logToTerminal: logToTerminal,
+                onLine: onLine
+            )
         }
 
+        let myToken = UUID()
+        queueTailToken = myToken
         let prev = queueTail
         let task = Task<CommandResult, Never> { [prev] in
             if let prev = prev {
                 _ = await prev.value
             }
-            return await self.execute(executable: executable, arguments: arguments, label: label, onLine: onLine)
+            return await self.execute(
+                executable: executable,
+                arguments: arguments,
+                label: label,
+                logToTerminal: logToTerminal,
+                onLine: onLine
+            )
         }
-        queueTail = Task {
+        queueTail = Task { @MainActor [weak self] in
             _ = await task.value
+            guard let self = self else { return }
+            if self.queueTailToken == myToken {
+                self.queueTail = nil
+                self.queueTailToken = nil
+            }
         }
         return await task.value
     }
 
-    private func appendLine(_ line: String, onLine: ((String) -> Void)?) {
-        terminalLines.append(line)
-        if terminalLines.count > maxTerminalLines {
-            terminalLines.removeFirst(terminalLines.count - maxTerminalLines)
+    private func appendLines(_ lines: [String], logToTerminal: Bool = true, onLine: ((String) -> Void)? = nil) {
+        guard !lines.isEmpty else { return }
+        if logToTerminal {
+            terminalLines.append(contentsOf: lines)
+            if terminalLines.count > 5500 {
+                terminalLines.removeFirst(terminalLines.count - maxTerminalLines)
+                terminalGeneration += 1
+            }
         }
-        onLine?(line)
+        if let onLine = onLine {
+            for line in lines {
+                onLine(line)
+            }
+        }
     }
 
     private func execute(
         executable: String,
         arguments: [String],
         label: String,
+        logToTerminal: Bool,
         onLine: ((String) -> Void)?
     ) async -> CommandResult {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
+        let isQuiet = !logToTerminal && onLine == nil
 
-        let runID = UUID()
-        activeProcesses[runID] = (process, label)
-        isRunning = true
-        currentCommandLabel = label
+        if logToTerminal {
+            onMutationCommandStart?()
+        }
 
-        defer {
-            activeProcesses.removeValue(forKey: runID)
-            if let remaining = activeProcesses.values.first {
-                currentCommandLabel = remaining.label
-                isRunning = true
+        if !isQuiet {
+            let cmdDisplay: String
+            if executable == "/bin/zsh" && arguments.count >= 2 && arguments[0] == "-c" {
+                cmdDisplay = "$ \(arguments[1])"
             } else {
-                currentCommandLabel = ""
-                isRunning = false
+                let argsStr = arguments.joined(separator: " ")
+                cmdDisplay = argsStr.isEmpty ? "$ \(executable)" : "$ \(executable) \(argsStr)"
             }
+            appendLines([cmdDisplay], logToTerminal: logToTerminal, onLine: onLine)
         }
-
-        let cmdDisplay: String
-        if executable == "/bin/zsh" && arguments.count >= 2 && arguments[0] == "-c" {
-            cmdDisplay = "$ \(arguments[1])"
-        } else {
-            let argsStr = arguments.joined(separator: " ")
-            cmdDisplay = argsStr.isEmpty ? "$ \(executable)" : "$ \(executable) \(argsStr)"
-        }
-        appendLine(cmdDisplay, onLine: onLine)
 
         if ProcessInfo.processInfo.environment["TEST_RUNNER"] == "1" {
             let fullCommand = arguments.joined(separator: " ")
@@ -181,6 +258,30 @@ public final class CommandRunner: ObservableObject {
                fullCommand.contains("mysqldump") ||
                fullCommand.contains("mysql ") {
                 return CommandResult(exitCode: 0, stdout: "", stderr: "")
+            }
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+
+        let runID = UUID()
+        if logToTerminal {
+            activeProcesses[runID] = (process, label)
+            isRunning = true
+            currentCommandLabel = label
+        }
+
+        defer {
+            if logToTerminal {
+                activeProcesses.removeValue(forKey: runID)
+                if let remaining = activeProcesses.values.first {
+                    currentCommandLabel = remaining.label
+                    isRunning = true
+                } else {
+                    currentCommandLabel = ""
+                    isRunning = false
+                }
             }
         }
 
@@ -196,46 +297,107 @@ public final class CommandRunner: ObservableObject {
         let stdoutHandle = stdoutPipe.fileHandleForReading
         let stderrHandle = stderrPipe.fileHandleForReading
 
-        let stdoutCollector = StreamCollector()
-        let stderrCollector = StreamCollector()
+        if isQuiet {
+            let stdoutCollector = StreamCollector(splitLines: false)
+            let stderrCollector = StreamCollector(splitLines: false)
 
-        stdoutHandle.readabilityHandler = { [weak self] handle in
+            stdoutHandle.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    handle.readabilityHandler = nil
+                    return
+                }
+                _ = stdoutCollector.appendData(data)
+            }
+
+            stderrHandle.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    handle.readabilityHandler = nil
+                    return
+                }
+                _ = stderrCollector.appendData(data)
+            }
+
+            do {
+                try process.run()
+            } catch {
+                let errMsg = error.localizedDescription
+                return CommandResult(exitCode: 127, stdout: "", stderr: errMsg)
+            }
+
+            await withCheckedContinuation { continuation in
+                process.terminationHandler = { _ in
+                    continuation.resume()
+                }
+            }
+
+            stdoutHandle.readabilityHandler = nil
+            stderrHandle.readabilityHandler = nil
+
+            let remainingStdout = stdoutHandle.readDataToEndOfFile()
+            let remainingStderr = stderrHandle.readDataToEndOfFile()
+
+            let (stdoutString, _) = stdoutCollector.finish(remainingData: remainingStdout)
+            let (stderrString, _) = stderrCollector.finish(remainingData: remainingStderr)
+
+            return CommandResult(
+                exitCode: process.terminationStatus,
+                stdout: stdoutString,
+                stderr: stderrString
+            )
+        }
+
+        let stdoutCollector = StreamCollector(splitLines: true)
+        let stderrCollector = StreamCollector(splitLines: true)
+
+        let pipeQueue = DispatchQueue(label: "mpcc.pipe.\(runID)")
+        let accumulator = LineAccumulator()
+
+        stdoutHandle.readabilityHandler = { handle in
             let data = handle.availableData
             if data.isEmpty {
                 handle.readabilityHandler = nil
                 return
             }
-            let lines = stdoutCollector.appendData(data)
-            if !lines.isEmpty {
-                DispatchQueue.main.async { [weak self] in
-                    for line in lines {
-                        self?.appendLine(line, onLine: onLine)
-                    }
+            pipeQueue.async {
+                let lines = stdoutCollector.appendData(data)
+                if !lines.isEmpty {
+                    accumulator.append(lines)
                 }
             }
         }
 
-        stderrHandle.readabilityHandler = { [weak self] handle in
+        stderrHandle.readabilityHandler = { handle in
             let data = handle.availableData
             if data.isEmpty {
                 handle.readabilityHandler = nil
                 return
             }
-            let lines = stderrCollector.appendData(data)
-            if !lines.isEmpty {
-                DispatchQueue.main.async { [weak self] in
-                    for line in lines {
-                        self?.appendLine(line, onLine: onLine)
-                    }
+            pipeQueue.async {
+                let lines = stderrCollector.appendData(data)
+                if !lines.isEmpty {
+                    accumulator.append(lines)
                 }
             }
         }
+
+        let flushTimer = DispatchSource.makeTimerSource(queue: .main)
+        flushTimer.schedule(deadline: .now() + .milliseconds(33), repeating: .milliseconds(33))
+        flushTimer.setEventHandler { [weak self] in
+            let toFlush = accumulator.drain()
+            if !toFlush.isEmpty {
+                self?.appendLines(toFlush, logToTerminal: logToTerminal, onLine: onLine)
+            }
+        }
+        flushTimer.resume()
 
         do {
             try process.run()
         } catch {
+            flushTimer.cancel()
             let errMsg = error.localizedDescription
-            appendLine("Error: \(errMsg)", onLine: onLine)
+            appendLines(["Error: \(errMsg)"], logToTerminal: logToTerminal, onLine: onLine)
             return CommandResult(exitCode: 127, stdout: "", stderr: errMsg)
         }
 
@@ -248,17 +410,22 @@ public final class CommandRunner: ObservableObject {
         stdoutHandle.readabilityHandler = nil
         stderrHandle.readabilityHandler = nil
 
+        flushTimer.cancel()
+
+        pipeQueue.sync {}
+
         let remainingStdout = stdoutHandle.readDataToEndOfFile()
         let remainingStderr = stderrHandle.readDataToEndOfFile()
 
         let (stdoutString, finalStdoutLines) = stdoutCollector.finish(remainingData: remainingStdout)
         let (stderrString, finalStderrLines) = stderrCollector.finish(remainingData: remainingStderr)
 
-        for line in finalStdoutLines {
-            appendLine(line, onLine: onLine)
-        }
-        for line in finalStderrLines {
-            appendLine(line, onLine: onLine)
+        var allRemaining = accumulator.drain()
+        allRemaining.append(contentsOf: finalStdoutLines)
+        allRemaining.append(contentsOf: finalStderrLines)
+
+        if !allRemaining.isEmpty {
+            appendLines(allRemaining, logToTerminal: logToTerminal, onLine: onLine)
         }
 
         return CommandResult(
