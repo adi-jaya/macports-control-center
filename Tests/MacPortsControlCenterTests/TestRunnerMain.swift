@@ -27,7 +27,27 @@ struct TestRunnerMain {
         tests.testSupportedPHPExtensionSubportsAndBuiltInCoreModules()
         tests.tearDown()
 
-        print("All MacPortsServiceTests passed successfully (5/5 tests)")
+        tests.setUp()
+        tests.testReadInstalledPortsSQLiteStripsQuotesAndDistinguishesActiveState()
+        tests.tearDown()
+
+        tests.setUp()
+        do {
+            try tests.testReadPortSelectGroupsFilesystemPlacesNoneLastAndHandlesMissingCurrent()
+        } catch {
+            fatalError("testReadPortSelectGroupsFilesystemPlacesNoneLastAndHandlesMissingCurrent failed: \(error)")
+        }
+        tests.tearDown()
+
+        tests.setUp()
+        do {
+            try tests.testSearchPortsNativeIndexHandlesNestedTclBracesAndFallsBackOnGlob()
+        } catch {
+            fatalError("testSearchPortsNativeIndexHandlesNestedTclBracesAndFallsBackOnGlob failed: \(error)")
+        }
+        tests.tearDown()
+
+        print("All MacPortsServiceTests passed successfully (8/8 tests)")
 
         print("Running CommandRunnerTests...")
         let cmdTests = CommandRunnerTests()

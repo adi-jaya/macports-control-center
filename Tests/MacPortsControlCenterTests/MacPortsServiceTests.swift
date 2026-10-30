@@ -1,8 +1,10 @@
+import Foundation
+import SQLite3
+
 #if canImport(XCTest)
 import XCTest
 @testable import MacPortsControlCenter
 #else
-import Foundation
 
 open class XCTestCase {
     public init() {}
@@ -142,5 +144,99 @@ final class MacPortsServiceTests: XCTestCase {
         XCTAssertEqual(MacPortsService.builtInPHPCoreModules.count, 8)
         XCTAssertTrue(MacPortsService.builtInPHPCoreModules.contains("bcmath"))
         XCTAssertTrue(MacPortsService.builtInPHPCoreModules.contains("phar"))
+    }
+
+    func testReadInstalledPortsSQLiteStripsQuotesAndDistinguishesActiveState() {
+        let tempDB = (NSTemporaryDirectory() as NSString).appendingPathComponent("reg_\(UUID().uuidString).db")
+        defer { try? FileManager.default.removeItem(atPath: tempDB) }
+
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(tempDB, &db), SQLITE_OK)
+        let setupSQL = """
+        CREATE TABLE ports (name TEXT, version TEXT, revision INTEGER, variants TEXT, state TEXT);
+        INSERT INTO ports VALUES ('ncurses', '''6.6''', 0, '', 'installed');
+        INSERT INTO ports VALUES ('curl', '8.22.0', 0, '+http2+ssl', 'imaged');
+        INSERT INTO ports VALUES ('curl', '8.23.0', 1, '+http2+ssl', 'installed');
+        INSERT INTO ports VALUES ('removed_pkg', '1.0', 0, '', 'uninstalled');
+        """
+        XCTAssertEqual(sqlite3_exec(db, setupSQL, nil, nil, nil), SQLITE_OK)
+        sqlite3_close(db)
+
+        let items = MacPortsService.readInstalledPortsSQLite(dbPath: tempDB)
+        XCTAssertNotNil(items)
+        XCTAssertEqual(items?.count, 3)
+        let ncurses = items?.first(where: { $0.name == "ncurses" })
+        XCTAssertEqual(ncurses?.version, "@6.6_0")
+        XCTAssertEqual(ncurses?.isActive, true)
+
+        let curlVersions = items?.filter { $0.name == "curl" } ?? []
+        XCTAssertEqual(curlVersions.count, 2)
+        XCTAssertTrue(curlVersions.contains(where: { $0.version == "@8.22.0_0+http2+ssl" && !$0.isActive }))
+        XCTAssertTrue(curlVersions.contains(where: { $0.version == "@8.23.0_1+http2+ssl" && $0.isActive }))
+        XCTAssertNil(MacPortsService.readInstalledPortsSQLite(dbPath: "/nonexistent/registry.db"))
+    }
+
+    func testReadPortSelectGroupsFilesystemPlacesNoneLastAndHandlesMissingCurrent() throws {
+        let root = (NSTemporaryDirectory() as NSString).appendingPathComponent("select_\(UUID().uuidString)")
+        let fm = FileManager.default
+        defer { try? fm.removeItem(atPath: root) }
+
+        try fm.createDirectory(atPath: "\(root)/mysql", withIntermediateDirectories: true)
+        try "".write(toFile: "\(root)/mysql/base", atomically: true, encoding: .utf8)
+        try "".write(toFile: "\(root)/mysql/none", atomically: true, encoding: .utf8)
+        try "".write(toFile: "\(root)/mysql/mariadb-10.11", atomically: true, encoding: .utf8)
+        try "".write(toFile: "\(root)/mysql/mariadb-11.4", atomically: true, encoding: .utf8)
+        try fm.createSymbolicLink(atPath: "\(root)/mysql/current", withDestinationPath: "mariadb-10.11")
+
+        try fm.createDirectory(atPath: "\(root)/python3", withIntermediateDirectories: true)
+        try "".write(toFile: "\(root)/python3/none", atomically: true, encoding: .utf8)
+        try "".write(toFile: "\(root)/python3/python314", atomically: true, encoding: .utf8)
+
+        let groups = MacPortsService.readPortSelectGroupsFilesystem(selectRootPath: root)
+        XCTAssertEqual(groups?.count, 2)
+        XCTAssertEqual(groups?[0], PortSelectGroup(group: "mysql", selected: "mariadb-10.11", options: ["mariadb-10.11", "mariadb-11.4", "none"]))
+        XCTAssertEqual(groups?[1], PortSelectGroup(group: "python3", selected: "none", options: ["python314", "none"]))
+    }
+
+    func testSearchPortsNativeIndexHandlesNestedTclBracesAndFallsBackOnGlob() throws {
+        let dir = (NSTemporaryDirectory() as NSString).appendingPathComponent("pidx_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+
+        let rec1Body = "variants {universal} platforms {{darwin any}} maintainers {{a @b} {c @d}} description {PHP: Hypertext Preprocessor} name php83 version 8.3.36 categories {lang php www} revision 0\n"
+        let rec1Header = "php83 \(rec1Body.utf8.count)\n"
+        let rec2Body = "description {Redis extension for PHP 8.3} name php83-redis version 6.0.2 categories {php databases}\n"
+        let rec2Header = "php83-redis \(rec2Body.utf8.count)\n"
+
+        let portIndexContent = rec1Header + rec1Body + rec2Header + rec2Body
+        let offset2 = (rec1Header + rec1Body).utf8.count
+        let quickContent = "php83 0\nphp83-redis \(offset2)\n"
+
+        let pPath = "\(dir)/PortIndex"
+        let qPath = "\(dir)/PortIndex.quick"
+        try portIndexContent.write(toFile: pPath, atomically: true, encoding: .utf8)
+        try quickContent.write(toFile: qPath, atomically: true, encoding: .utf8)
+
+        let results = MacPortsService.searchPortsNativeIndex(
+            query: "PHP83",
+            indexPaths: [(quickIndexPath: qPath, portIndexPath: pPath)],
+            installed: ["php83": (version: "@8.3.36_0", active: true)],
+            outdated: ["php83"]
+        )
+        XCTAssertEqual(results?.count, 2)
+        XCTAssertEqual(results?[0].name, "php83")
+        XCTAssertEqual(results?[0].version, "8.3.36")
+        XCTAssertEqual(results?[0].category, "lang php www")
+        XCTAssertEqual(results?[0].summary, "PHP: Hypertext Preprocessor")
+        XCTAssertEqual(results?[0].isInstalled, true)
+        XCTAssertEqual(results?[0].isOutdated, true)
+
+        let globResult = MacPortsService.searchPortsNativeIndex(
+            query: "php8*",
+            indexPaths: [(quickIndexPath: qPath, portIndexPath: pPath)],
+            installed: [:],
+            outdated: []
+        )
+        XCTAssertNil(globResult, "Glob queries must return nil to trigger CLI fallback")
     }
 }

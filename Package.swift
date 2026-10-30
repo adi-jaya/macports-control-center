@@ -22,7 +22,8 @@ let package = Package(
     targets: [
         .target(
             name: "MacPortsControlCenter",
-            dependencies: []
+            dependencies: [],
+            linkerSettings: [.linkedLibrary("sqlite3")]
         ),
         .executableTarget(
             name: "MacPortsControlCenterApp",

@@ -95,14 +95,17 @@ public struct DoctorService {
         return "chmod -R u+rwX '\(safePath)/storage' '\(safePath)/bootstrap/cache'"
     }
 
+    /// Validates username characters without regex evaluation
+    public static func isValidUsername(_ s: String) -> Bool {
+        return !s.isEmpty && s.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "." || $0 == "-") }
+    }
+
     /// Builds the root-level shell script executed via osascript with administrator privileges.
-    /// Validates `currentUser` against `^[a-zA-Z0-9_.-]+$` to prevent sudoers corruption or injection.
+    /// Validates `currentUser` against valid username characters to prevent sudoers corruption or injection.
     public static func buildPrivilegedAutoFixScript(currentUser: String) -> String {
         let trimmedUser = currentUser.trimmingCharacters(in: .whitespacesAndNewlines)
-        let usernameRegex = "^[a-zA-Z0-9_.-]+$"
-        let isValid = !trimmedUser.isEmpty && trimmedUser.range(of: usernameRegex, options: .regularExpression) != nil
-        let targetUser = isValid ? trimmedUser : NSUserName()
-        let safeUser = (!targetUser.isEmpty && targetUser.range(of: usernameRegex, options: .regularExpression) != nil) ? targetUser : "admin"
+        let targetUser = isValidUsername(trimmedUser) ? trimmedUser : NSUserName()
+        let safeUser = isValidUsername(targetUser) ? targetUser : "admin"
 
         return """
         #!/bin/bash
