@@ -80,6 +80,13 @@ public final class AppState: ObservableObject {
     @Published public var packageSearchQuery: String = ""
     @Published public var isSearchingPackages: Bool = false
 
+    @Published public private(set) var isMySQLSocketConnected: Bool = false
+    @Published public private(set) var installedDatabaseEngines: Set<String> = []
+
+    // MARK: - Package Caches
+    private var cachedInstalledPorts: [PortPackageItem]? = nil
+    private var cachedOutdatedPorts: Set<String>? = nil
+
     // MARK: - Services & Configuration
     public let commandRunner: CommandRunner
     public let repoPath: String
@@ -94,7 +101,8 @@ public final class AppState: ObservableObject {
         defaultSocketPath: String = "/tmp/mysql.sock",
         commandRunner: CommandRunner? = nil
     ) {
-        self.commandRunner = commandRunner ?? CommandRunner()
+        let runner = commandRunner ?? CommandRunner()
+        self.commandRunner = runner
         self.nginxServersPath = nginxServersPath
         self.defaultSocketPath = defaultSocketPath
 
@@ -119,7 +127,15 @@ public final class AppState: ObservableObject {
         }()
         self.repoPath = resolvedRepoPath
 
-        // Load documentation files synchronously
+        // Wire auto-expand hook on mutation commands
+        runner.onMutationCommandStart = { [weak self] in
+            guard let self = self else { return }
+            if !self.isTerminalDrawerExpanded {
+                self.isTerminalDrawerExpanded = true
+            }
+        }
+
+        // Load documentation files metadata synchronously (lazy content loading)
         loadDocumentationFiles()
 
         // Optionally trigger initial scan
@@ -127,6 +143,13 @@ public final class AppState: ObservableObject {
             Task { [weak self] in
                 await self?.refreshAll()
             }
+        }
+    }
+
+    // MARK: - Equality Guard Helper
+    private func assignIfChanged<T: Equatable>(_ keyPath: ReferenceWritableKeyPath<AppState, T>, _ newValue: T) {
+        if self[keyPath: keyPath] != newValue {
+            self[keyPath: keyPath] = newValue
         }
     }
 
@@ -181,8 +204,12 @@ public final class AppState: ObservableObject {
         self.docFiles = items
         if selectedDoc == nil, let first = items.first {
             selectedDoc = first
-            selectedDocContent = loadDocContent(doc: first)
         }
+    }
+
+    public func ensureSelectedDocLoaded() {
+        guard selectedDocContent.isEmpty, let doc = selectedDoc else { return }
+        selectedDocContent = loadDocContent(doc: doc)
     }
 
     public func selectDoc(_ doc: DocItem) {
@@ -197,6 +224,14 @@ public final class AppState: ObservableObject {
         return content
     }
 
+    public func purgeTransientCachesForBackground() {
+        selectedDocContent = ""
+        if !packageSearchQuery.isEmpty {
+            packageSearchQuery = ""
+            packages = []
+        }
+    }
+
     // MARK: - Command Palette
     public func buildPaletteCommands() -> [PaletteCommand] {
         var commands: [PaletteCommand] = []
@@ -204,6 +239,7 @@ public final class AppState: ObservableObject {
         // Navigation Commands
         for section in NavigationSection.allCases {
             commands.append(PaletteCommand(
+                id: "nav-\(section.rawValue)",
                 title: "Go to \(section.displayName)",
                 subtitle: "Switch view to \(section.displayName)",
                 action: { [weak self] in
@@ -215,6 +251,7 @@ public final class AppState: ObservableObject {
 
         // Quick Stack Actions
         commands.append(PaletteCommand(
+            id: "action-restart-stack",
             title: "Restart Web Stack",
             subtitle: "Reload Nginx and active PHP-FPM daemons",
             action: { [weak self] in
@@ -224,6 +261,7 @@ public final class AppState: ObservableObject {
         ))
 
         commands.append(PaletteCommand(
+            id: "action-start-stack",
             title: "Start Web Stack",
             subtitle: "Load Nginx and PHP-FPM services",
             action: { [weak self] in
@@ -233,6 +271,7 @@ public final class AppState: ObservableObject {
         ))
 
         commands.append(PaletteCommand(
+            id: "action-stop-all",
             title: "Stop All Services",
             subtitle: "Unload running web and database services",
             action: { [weak self] in
@@ -242,6 +281,7 @@ public final class AppState: ObservableObject {
         ))
 
         commands.append(PaletteCommand(
+            id: "action-reload-nginx",
             title: "Reload Nginx",
             subtitle: "Validate configuration syntax and reload Nginx server",
             action: { [weak self] in
@@ -251,6 +291,7 @@ public final class AppState: ObservableObject {
         ))
 
         commands.append(PaletteCommand(
+            id: "action-doctor-autofix",
             title: "Run Stack Doctor Auto-Fix",
             subtitle: "Repair permissions, sudoers, and configs with 1-click",
             action: { [weak self] in
@@ -260,6 +301,7 @@ public final class AppState: ObservableObject {
         ))
 
         commands.append(PaletteCommand(
+            id: "action-refresh-all",
             title: "Refresh All Services & Status",
             subtitle: "Rescan daemons, vhosts, databases, and doctor checks",
             action: { [weak self] in
@@ -269,6 +311,7 @@ public final class AppState: ObservableObject {
         ))
 
         commands.append(PaletteCommand(
+            id: "action-selfupdate",
             title: "Sync MacPorts (port selfupdate)",
             subtitle: "Update PortIndex and MacPorts base system",
             action: { [weak self] in
@@ -278,6 +321,7 @@ public final class AppState: ObservableObject {
         ))
 
         commands.append(PaletteCommand(
+            id: "action-upgrade-outdated",
             title: "Upgrade Outdated Ports",
             subtitle: "Upgrade all installed ports that have new versions",
             action: { [weak self] in
@@ -287,6 +331,7 @@ public final class AppState: ObservableObject {
         ))
 
         commands.append(PaletteCommand(
+            id: "action-uninstall-leaves",
             title: "Uninstall Leaves",
             subtitle: "Clean unneeded dependency packages (port uninstall leaves)",
             action: { [weak self] in
@@ -296,6 +341,7 @@ public final class AppState: ObservableObject {
         ))
 
         commands.append(PaletteCommand(
+            id: "action-clear-terminal",
             title: "Clear Terminal Output",
             subtitle: "Clear all streamed output in the docked terminal drawer",
             action: { [weak self] in
@@ -305,6 +351,7 @@ public final class AppState: ObservableObject {
         ))
 
         commands.append(PaletteCommand(
+            id: "action-toggle-terminal",
             title: "Toggle Terminal Drawer",
             subtitle: "Expand or collapse the bottom terminal drawer",
             action: { [weak self] in
@@ -316,6 +363,7 @@ public final class AppState: ObservableObject {
         // Dynamic Switch PHP CLI commands
         for php in phpVersions where php.isInstalled {
             commands.append(PaletteCommand(
+                id: "php-cli-\(php.portName)",
                 title: "Switch CLI to PHP \(php.version)",
                 subtitle: "Set system default PHP via port select --set php \(php.portName)",
                 action: { [weak self] in
@@ -340,56 +388,83 @@ public final class AppState: ObservableObject {
         }
     }
 
-    // MARK: - Refresh All Operations
-    public func refreshAll() async {
-        isLoading = true
-        defer { isLoading = false }
-
-        await refreshServices()
-        await refreshVHosts()
-        await refreshPHPVersions()
-        await refreshDatabases()
-        await refreshPortSelect()
-        await refreshDoctorChecks()
+    // MARK: - Package Caches & Fetching Helpers
+    public func invalidatePackageCaches() {
+        cachedInstalledPorts = nil
+        cachedOutdatedPorts = nil
     }
 
-    public func refreshServices() async {
+    private func fetchInstalledPorts(useCache: Bool = true) async -> [PortPackageItem] {
+        if useCache, let cached = cachedInstalledPorts {
+            return cached
+        }
+        if let sqliteItems = await Task.detached(priority: .userInitiated, operation: {
+            MacPortsService.readInstalledPortsSQLite()
+        }).value {
+            if useCache {
+                cachedInstalledPorts = sqliteItems
+            }
+            return sqliteItems
+        }
+        let res = await commandRunner.run(
+            executable: "/opt/local/bin/port",
+            arguments: ["installed"],
+            label: "check-installed",
+            serialized: false,
+            logToTerminal: false
+        )
+        let parsed = MacPortsService.parseInstalledPorts(res.stdout)
+        if useCache {
+            cachedInstalledPorts = parsed
+        }
+        return parsed
+    }
+
+    private func fetchOutdatedPorts(useCache: Bool = true) async -> Set<String> {
+        if useCache, let cached = cachedOutdatedPorts {
+            return cached
+        }
+        let res = await commandRunner.run(
+            executable: "/opt/local/bin/port",
+            arguments: ["outdated"],
+            label: "check-outdated",
+            serialized: false,
+            logToTerminal: false
+        )
+        let parsed = MacPortsService.parseOutdatedPorts(res.stdout)
+        if useCache {
+            cachedOutdatedPorts = parsed
+        }
+        return parsed
+    }
+
+    private func fetchPortSelectGroups() async -> [PortSelectGroup] {
+        if let fsGroups = await Task.detached(priority: .userInitiated, operation: {
+            MacPortsService.readPortSelectGroupsFilesystem()
+        }).value {
+            return fsGroups
+        }
+        let res = await commandRunner.run(
+            executable: "/opt/local/bin/port",
+            arguments: ["select", "--summary"],
+            label: "port-select-summary",
+            serialized: false,
+            logToTerminal: false
+        )
+        return MacPortsService.parsePortSelectSummary(res.stdout)
+    }
+
+    private func deriveServices(psOutput: String) -> [ServiceItem] {
         let entries = MacPortsService.listLaunchDaemonEntries()
         let symlinks = MacPortsService.listEnabledBootSymlinks()
-        let psResult = await commandRunner.runShell("ps aux", label: "check-services-ps", serialized: false)
-        let discovered = MacPortsService.discoverLaunchDaemons(
+        return MacPortsService.discoverLaunchDaemons(
             entryNames: entries,
             enabledSymlinks: symlinks,
-            psOutput: psResult.stdout
+            psOutput: psOutput
         )
-        self.services = discovered
     }
 
-    public func refreshVHosts() async {
-        guard let files = try? FileManager.default.contentsOfDirectory(atPath: nginxServersPath) else {
-            self.vhosts = []
-            return
-        }
-        var items: [VHostItem] = []
-        for file in files.sorted() where file.hasSuffix(".conf") && !file.hasPrefix(".") {
-            let fullPath = (nginxServersPath as NSString).appendingPathComponent(file)
-            if let vhost = ConfigFileService.parseVHost(filePath: fullPath) {
-                items.append(vhost)
-            }
-        }
-        self.vhosts = items
-    }
-
-    public func refreshPHPVersions() async {
-        let psResult = await commandRunner.runShell("ps aux", label: "check-php-ps", serialized: false)
-        let installedResult = await commandRunner.runShell("/opt/local/bin/port installed", label: "check-php-installed", serialized: false)
-        let selectResult = await commandRunner.runShell("/opt/local/bin/port select --summary", label: "check-php-select", serialized: false)
-
-        let installedPorts = MacPortsService.parseInstalledPorts(installedResult.stdout)
-        let installedNames = Set(installedPorts.map { $0.name })
-        let selectGroups = MacPortsService.parsePortSelectSummary(selectResult.stdout)
-        let defaultPHP = selectGroups.first(where: { $0.group == "php" })?.selected ?? "none"
-
+    private func derivePHPVersions(psOutput: String, installedNames: Set<String>, defaultPHP: String) -> [PHPVersionItem] {
         let supportedVersions: [(version: String, portName: String, fpmPort: Int)] = [
             ("8.1", "php81", 9081),
             ("8.2", "php82", 9082),
@@ -402,10 +477,9 @@ public final class AppState: ObservableObject {
         for entry in supportedVersions {
             let isInstalled = installedNames.contains(entry.portName)
             let isCLIDefault = (defaultPHP == entry.portName)
-            let isFPMRunning = psResult.stdout.contains("\(entry.portName)-fpm") ||
-                               (psResult.stdout.contains("php-fpm") && psResult.stdout.contains(entry.portName))
+            let isFPMRunning = psOutput.contains("\(entry.portName)-fpm") ||
+                               (psOutput.contains("php-fpm") && psOutput.contains(entry.portName))
 
-            // Check installed extension subports
             var extensions = Set<String>()
             for subport in MacPortsService.supportedPHPExtensionSubports {
                 let pkgName = "\(entry.portName)-\(subport)"
@@ -424,55 +498,240 @@ public final class AppState: ObservableObject {
                 installedExtensions: extensions
             ))
         }
+        return items
+    }
 
-        self.phpVersions = items
+    private func deriveDoctorChecks(services: [ServiceItem], socketPresent: Bool) async -> [DoctorCheckItem] {
+        let currentNginxPath = nginxServersPath
+        return await Task.detached(priority: .userInitiated) { () -> [DoctorCheckItem] in
+            let sudoersContent = (try? String(contentsOfFile: "/etc/sudoers.d/macports", encoding: .utf8)) ?? ""
+            let sudoersOK = sudoersContent.contains("NOPASSWD: /opt/local/bin/port")
+
+            var nonCompliantFPM: [String] = []
+            let currentUserName = NSUserName()
+            for v in ["81", "82", "83", "84", "85"] {
+                let confPath = "/opt/local/etc/php\(v)/php-fpm.d/www.conf"
+                if let content = try? String(contentsOfFile: confPath, encoding: .utf8) {
+                    let hasUser = content.contains("user = \(currentUserName)")
+                    let hasGroup = content.contains("group = staff")
+                    if !hasUser || !hasGroup {
+                        nonCompliantFPM.append(confPath)
+                    }
+                }
+            }
+
+            let nginxWritable = DoctorService.isNginxServersWritable(path: currentNginxPath)
+            let isMariaDBRunning = services.first(where: { $0.name.contains("mariadb") || $0.name.contains("mysql") })?.isRunning == true
+            let unreadableLogs = DoctorService.findUnreadableLogFiles(paths: DoctorService.defaultMonitoredLogPaths())
+
+            return DoctorService.evaluateChecks(
+                sudoersOK: sudoersOK,
+                nonCompliantFPMFiles: nonCompliantFPM,
+                nginxServersWritable: nginxWritable,
+                mariaDBRunning: isMariaDBRunning,
+                mysqlSocketExists: socketPresent,
+                unreadableLogFiles: unreadableLogs
+            )
+        }.value
+    }
+
+    // MARK: - Refresh All Operations
+    public func refreshAll() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        // Start concurrent background snapshot reads
+        async let psResultTask = commandRunner.run(
+            executable: "/bin/ps",
+            arguments: ["-axo", "command"],
+            label: "check-services-ps",
+            serialized: false,
+            logToTerminal: false
+        )
+
+        let currentNginxPath = nginxServersPath
+        async let vhostsTask = Task.detached(priority: .userInitiated) { () -> [VHostItem] in
+            guard let files = try? FileManager.default.contentsOfDirectory(atPath: currentNginxPath) else {
+                return []
+            }
+            var items: [VHostItem] = []
+            for file in files.sorted() where file.hasSuffix(".conf") && !file.hasPrefix(".") {
+                let fullPath = (currentNginxPath as NSString).appendingPathComponent(file)
+                if let vhost = ConfigFileService.parseVHost(filePath: fullPath) {
+                    items.append(vhost)
+                }
+            }
+            return items
+        }.value
+
+        async let installedPortsTask = fetchInstalledPorts(useCache: false)
+        async let selectGroupsTask = fetchPortSelectGroups()
+
+        let sockPath = defaultSocketPath
+        async let socketPresentTask = Task.detached(priority: .userInitiated) {
+            DoctorService.isMySQLSocketPresent(path: sockPath)
+        }.value
+
+        // Await shared snapshots
+        let psResult = await psResultTask
+        let vhosts = await vhostsTask
+        let installedPorts = await installedPortsTask
+        let selectGroups = await selectGroupsTask
+        let socketPresent = await socketPresentTask
+
+        // Cache installed ports snapshot
+        self.cachedInstalledPorts = installedPorts
+
+        // Derive services & PHP versions
+        let services = deriveServices(psOutput: psResult.stdout)
+        let installedNames = Set(installedPorts.map { $0.name })
+        let defaultPHP = selectGroups.first(where: { $0.group == "php" })?.selected ?? "none"
+        let phpVersions = derivePHPVersions(psOutput: psResult.stdout, installedNames: installedNames, defaultPHP: defaultPHP)
+
+        // MySQL database query only when socket is present
+        let databases: [String]
+        if socketPresent {
+            let dbResult = await commandRunner.run(
+                executable: "/opt/local/bin/mysql",
+                arguments: ["-u", "root", "--socket=\(sockPath)", "-N", "-B", "-e", "SHOW DATABASES;"],
+                label: "show-databases",
+                serialized: false,
+                logToTerminal: false
+            )
+            databases = DatabaseService.parseShowDatabases(dbResult.stdout)
+        } else {
+            databases = []
+        }
+
+        // Derive installed DB engines off-main-thread
+        let serviceNames = services.map { $0.name }
+        let engines = await Task.detached(priority: .userInitiated) { () -> Set<String> in
+            var found = Set<String>()
+            let candidates = ["mariadb-10.11-server", "mariadb-11.4-server", "mysql8-server"]
+            for candidate in candidates {
+                if installedNames.contains(candidate) || serviceNames.contains(where: { $0.contains(candidate) || candidate.contains($0) }) {
+                    found.insert(candidate)
+                    continue
+                }
+                if candidate == "mariadb-10.11-server" {
+                    if FileManager.default.fileExists(atPath: "/opt/local/etc/mariadb-10.11/my.cnf") ||
+                       FileManager.default.fileExists(atPath: "/opt/local/var/db/mariadb-10.11") {
+                        found.insert(candidate)
+                    }
+                } else if candidate == "mariadb-11.4-server" {
+                    if FileManager.default.fileExists(atPath: "/opt/local/etc/mariadb-11.4/my.cnf") ||
+                       FileManager.default.fileExists(atPath: "/opt/local/var/db/mariadb-11.4") {
+                        found.insert(candidate)
+                    }
+                } else if candidate == "mysql8-server" {
+                    if FileManager.default.fileExists(atPath: "/opt/local/etc/mysql8/my.cnf") {
+                        found.insert(candidate)
+                    }
+                }
+            }
+            return found
+        }.value
+
+        // Derive doctor checks
+        let doctorChecks = await deriveDoctorChecks(services: services, socketPresent: socketPresent)
+
+        // Update all @Published properties using equality guards
+        assignIfChanged(\.services, services)
+        assignIfChanged(\.vhosts, vhosts)
+        assignIfChanged(\.phpVersions, phpVersions)
+        assignIfChanged(\.portSelectGroups, selectGroups)
+        assignIfChanged(\.isMySQLSocketConnected, socketPresent)
+        assignIfChanged(\.databases, databases)
+        assignIfChanged(\.installedDatabaseEngines, engines)
+        assignIfChanged(\.doctorChecks, doctorChecks)
+    }
+
+    public func refreshServices() async {
+        let psResult = await commandRunner.run(
+            executable: "/bin/ps",
+            arguments: ["-axo", "command"],
+            label: "check-services-ps",
+            serialized: false,
+            logToTerminal: false
+        )
+        let discovered = deriveServices(psOutput: psResult.stdout)
+        assignIfChanged(\.services, discovered)
+    }
+
+    public func refreshVHosts() async {
+        let currentNginxPath = nginxServersPath
+        let items = await Task.detached(priority: .userInitiated) { () -> [VHostItem] in
+            guard let files = try? FileManager.default.contentsOfDirectory(atPath: currentNginxPath) else {
+                return []
+            }
+            var res: [VHostItem] = []
+            for file in files.sorted() where file.hasSuffix(".conf") && !file.hasPrefix(".") {
+                let fullPath = (currentNginxPath as NSString).appendingPathComponent(file)
+                if let vhost = ConfigFileService.parseVHost(filePath: fullPath) {
+                    res.append(vhost)
+                }
+            }
+            return res
+        }.value
+        assignIfChanged(\.vhosts, items)
+    }
+
+    public func refreshPHPVersions() async {
+        async let psResultTask = commandRunner.run(
+            executable: "/bin/ps",
+            arguments: ["-axo", "command"],
+            label: "check-php-ps",
+            serialized: false,
+            logToTerminal: false
+        )
+        async let installedPortsTask = fetchInstalledPorts(useCache: true)
+        async let selectGroupsTask = fetchPortSelectGroups()
+
+        let psResult = await psResultTask
+        let installedPorts = await installedPortsTask
+        let selectGroups = await selectGroupsTask
+
+        let installedNames = Set(installedPorts.map { $0.name })
+        let defaultPHP = selectGroups.first(where: { $0.group == "php" })?.selected ?? "none"
+        let items = derivePHPVersions(psOutput: psResult.stdout, installedNames: installedNames, defaultPHP: defaultPHP)
+        assignIfChanged(\.phpVersions, items)
     }
 
     public func refreshDatabases() async {
-        let cmd = DatabaseService.buildShowDatabasesCommand(socketPath: defaultSocketPath)
-        let result = await commandRunner.runShell(cmd, label: "show-databases", serialized: false)
+        let sockPath = defaultSocketPath
+        let socketPresent = await Task.detached(priority: .userInitiated) {
+            DoctorService.isMySQLSocketPresent(path: sockPath)
+        }.value
+
+        assignIfChanged(\.isMySQLSocketConnected, socketPresent)
+        guard socketPresent else {
+            assignIfChanged(\.databases, [])
+            return
+        }
+
+        let result = await commandRunner.run(
+            executable: "/opt/local/bin/mysql",
+            arguments: ["-u", "root", "--socket=\(sockPath)", "-N", "-B", "-e", "SHOW DATABASES;"],
+            label: "show-databases",
+            serialized: false,
+            logToTerminal: false
+        )
         let dbs = DatabaseService.parseShowDatabases(result.stdout)
-        self.databases = dbs
+        assignIfChanged(\.databases, dbs)
     }
 
     public func refreshPortSelect() async {
-        let result = await commandRunner.runShell("/opt/local/bin/port select --summary", label: "port-select-summary", serialized: false)
-        let groups = MacPortsService.parsePortSelectSummary(result.stdout)
-        self.portSelectGroups = groups
+        let groups = await fetchPortSelectGroups()
+        assignIfChanged(\.portSelectGroups, groups)
     }
 
     public func refreshDoctorChecks() async {
-        let sudoersContent = (try? String(contentsOfFile: "/etc/sudoers.d/macports", encoding: .utf8)) ?? ""
-        let sudoersOK = sudoersContent.contains("NOPASSWD: /opt/local/bin/port")
-
-        // Find non-compliant FPM pools
-        var nonCompliantFPM: [String] = []
-        let currentUserName = NSUserName()
-        for v in ["81", "82", "83", "84", "85"] {
-            let confPath = "/opt/local/etc/php\(v)/php-fpm.d/www.conf"
-            if let content = try? String(contentsOfFile: confPath, encoding: .utf8) {
-                let hasUser = content.contains("user = \(currentUserName)")
-                let hasGroup = content.contains("group = staff")
-                if !hasUser || !hasGroup {
-                    nonCompliantFPM.append(confPath)
-                }
-            }
-        }
-
-        let nginxWritable = DoctorService.isNginxServersWritable(path: nginxServersPath)
-        let isMariaDBRunning = services.first(where: { $0.name.contains("mariadb") || $0.name.contains("mysql") })?.isRunning == true
-        let mysqlSocketPresent = DoctorService.isMySQLSocketPresent(path: defaultSocketPath)
-        let unreadableLogs = DoctorService.findUnreadableLogFiles(paths: DoctorService.defaultMonitoredLogPaths())
-
-        let checks = DoctorService.evaluateChecks(
-            sudoersOK: sudoersOK,
-            nonCompliantFPMFiles: nonCompliantFPM,
-            nginxServersWritable: nginxWritable,
-            mariaDBRunning: isMariaDBRunning,
-            mysqlSocketExists: mysqlSocketPresent,
-            unreadableLogFiles: unreadableLogs
-        )
-        self.doctorChecks = checks
+        let sockPath = defaultSocketPath
+        let socketPresent = await Task.detached(priority: .userInitiated) {
+            DoctorService.isMySQLSocketPresent(path: sockPath)
+        }.value
+        let checks = await deriveDoctorChecks(services: self.services, socketPresent: socketPresent)
+        assignIfChanged(\.doctorChecks, checks)
     }
 
     // MARK: - Service Control Actions
@@ -500,14 +759,21 @@ public final class AppState: ObservableObject {
     }
 
     public func stopAllServices() async {
-        for service in services where service.isRunning {
-            _ = await commandRunner.runShell("sudo -n /opt/local/bin/port unload \(service.name)", label: "stop-\(service.name)")
+        let runningNames = services.filter(\.isRunning).map(\.name)
+        if !runningNames.isEmpty {
+            _ = await commandRunner.runShell("sudo -n /opt/local/bin/port unload \(runningNames.joined(separator: " "))", label: "stop-all-services")
         }
         await refreshServices()
     }
 
     public func reloadNginx() async {
-        let test = await commandRunner.runShell("/opt/local/sbin/nginx -t", label: "test-nginx", serialized: false)
+        let test = await commandRunner.run(
+            executable: "/opt/local/sbin/nginx",
+            arguments: ["-t"],
+            label: "test-nginx",
+            serialized: false,
+            logToTerminal: false
+        )
         guard ConfigFileService.isNginxTestOutputValid(exitCode: test.exitCode, output: test.stderr + "\n" + test.stdout) else {
             statusMessage = "Nginx syntax error! Reload aborted."
             return
@@ -567,6 +833,7 @@ public final class AppState: ObservableObject {
             await writeConfigFile(content: updated, targetPath: wwwConfPath)
         }
 
+        invalidatePackageCaches()
         await refreshPHPVersions()
     }
 
@@ -575,6 +842,7 @@ public final class AppState: ObservableObject {
         let pkg = "php\(v)-\(ext)"
         let action = install ? "install" : "uninstall"
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port \(action) \(pkg)", label: "\(action)-\(pkg)")
+        invalidatePackageCaches()
         await refreshPHPVersions()
     }
 
@@ -584,6 +852,7 @@ public final class AppState: ObservableObject {
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port unload \(portName)-fpm", label: "unload-\(portName)-fpm")
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port -N uninstall --follow-dependents \(portName)", label: "uninstall-\(portName)")
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port -N uninstall leaves", label: "uninstall-leaves")
+        invalidatePackageCaches()
         await refreshPHPVersions()
         await refreshPortSelect()
     }
@@ -628,7 +897,13 @@ public final class AppState: ObservableObject {
             content: content
         ) { [weak self] in
             guard let self = self else { return (false, "AppState deallocated") }
-            let test = await self.commandRunner.runShell("/opt/local/sbin/nginx -t", label: "test-nginx", serialized: false)
+            let test = await self.commandRunner.run(
+                executable: "/opt/local/sbin/nginx",
+                arguments: ["-t"],
+                label: "test-nginx",
+                serialized: false,
+                logToTerminal: false
+            )
             let isValid = ConfigFileService.isNginxTestOutputValid(exitCode: test.exitCode, output: test.stderr + "\n" + test.stdout)
             return (isValid, test.stderr)
         }
@@ -667,21 +942,25 @@ public final class AppState: ObservableObject {
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port load dnsmasq", label: "load-dnsmasq")
         let adminArgs = DoctorService.buildOsascriptAdminCommand(shellScript: "mkdir -p /etc/resolver && echo 'nameserver 127.0.0.1' > /etc/resolver/test")
         _ = await commandRunner.run(executable: "/usr/bin/osascript", arguments: adminArgs, label: "setup-resolver-dnsmasq")
+        invalidatePackageCaches()
         await refreshServices()
     }
 
     public func setupMkcert() async {
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port install mkcert", label: "install-mkcert")
         _ = await commandRunner.runShell("mkcert -install", label: "mkcert-install-ca")
+        invalidatePackageCaches()
     }
 
     public func setupRedis() async {
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port install redis && sudo -n /opt/local/bin/port load redis", label: "install-load-redis")
+        invalidatePackageCaches()
         await refreshServices()
     }
 
     public func setupFnmAndComposer() async {
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port install fnm composer", label: "install-fnm-composer")
+        invalidatePackageCaches()
     }
 
     // MARK: - Stack Doctor Auto-Fix
@@ -727,32 +1006,46 @@ public final class AppState: ObservableObject {
         isSearchingPackages = true
         defer { isSearchingPackages = false }
 
-        let installedRes = await commandRunner.runShell("/opt/local/bin/port installed", label: "installed-ports", serialized: false)
-        let outdatedRes = await commandRunner.runShell("/opt/local/bin/port outdated", label: "outdated-ports", serialized: false)
-        let searchRes = await commandRunner.runShell("/opt/local/bin/port search --name --line \(trimmed)", label: "search-\(trimmed)", serialized: false)
-
-        let installedItems = MacPortsService.parseInstalledPorts(installedRes.stdout)
+        let installedItems = await fetchInstalledPorts(useCache: true)
+        let outdatedSet = await fetchOutdatedPorts(useCache: true)
         let installedMap = MacPortsService.buildInstalledLookupMap(installedItems)
-        let outdatedSet = MacPortsService.parseOutdatedPorts(outdatedRes.stdout)
 
-        let results = MacPortsService.parseSearchOutput(searchRes.stdout, installed: installedMap, outdated: outdatedSet)
-        self.packages = results
+        let nativeResults = await Task.detached(priority: .userInitiated) {
+            MacPortsService.searchPortsNativeIndex(query: trimmed, installed: installedMap, outdated: outdatedSet)
+        }.value
+
+        let results: [PortPackageItem]
+        if let native = nativeResults {
+            results = native
+        } else {
+            let searchRes = await commandRunner.run(
+                executable: "/opt/local/bin/port",
+                arguments: ["search", "--name", "--line", trimmed],
+                label: "search-\(trimmed)",
+                serialized: false,
+                logToTerminal: false
+            )
+            results = MacPortsService.parseSearchOutput(searchRes.stdout, installed: installedMap, outdated: outdatedSet)
+        }
+
+        guard !Task.isCancelled else { return }
+        assignIfChanged(\.packages, results)
     }
 
     public func loadInstalledPackages() async {
         isSearchingPackages = true
         defer { isSearchingPackages = false }
 
-        let installedRes = await commandRunner.runShell("/opt/local/bin/port installed", label: "installed-ports", serialized: false)
-        let outdatedRes = await commandRunner.runShell("/opt/local/bin/port outdated", label: "outdated-ports", serialized: false)
-        let installedItems = MacPortsService.parseInstalledPorts(installedRes.stdout)
-        let outdatedSet = MacPortsService.parseOutdatedPorts(outdatedRes.stdout)
+        let installedItems = await fetchInstalledPorts(useCache: true)
+        let outdatedSet = await fetchOutdatedPorts(useCache: true)
 
-        self.packages = installedItems.map { item in
+        let mapped = installedItems.map { item in
             var updated = item
             updated.isOutdated = outdatedSet.contains(item.name)
             return updated
         }
+        guard !Task.isCancelled else { return }
+        assignIfChanged(\.packages, mapped)
     }
 
     public func installPackage(name: String) async {
@@ -787,6 +1080,7 @@ public final class AppState: ObservableObject {
     }
 
     private func refreshAfterPackageChange() async {
+        invalidatePackageCaches()
         if !packageSearchQuery.isEmpty {
             await searchPackages(query: packageSearchQuery)
         } else {
@@ -806,22 +1100,26 @@ public final class AppState: ObservableObject {
 
     public func runSelfUpdate() async {
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port selfupdate", label: "port-selfupdate")
+        invalidatePackageCaches()
         await refreshAll()
     }
 
     public func runUpgradeOutdated() async {
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port upgrade outdated", label: "port-upgrade-outdated")
+        invalidatePackageCaches()
         await refreshAll()
     }
 
     public func runUninstallLeaves() async {
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port -N uninstall leaves", label: "port-uninstall-leaves")
+        invalidatePackageCaches()
         await refreshAll()
     }
 
     // MARK: - Database Actions
     public func installDatabaseEngine(portName: String) async {
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port install \(portName) && sudo -n /opt/local/bin/port load \(portName)", label: "install-\(portName)")
+        invalidatePackageCaches()
         await refreshServices()
         await refreshDatabases()
     }

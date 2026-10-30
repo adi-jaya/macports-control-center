@@ -243,7 +243,15 @@ struct TestRunnerMain {
         appStateTests.testLogViewTabsAndPaths()
         appStateTests.tearDown()
 
-        print("All AppStateTests passed successfully (17/17 tests)")
+        appStateTests.setUp()
+        appStateTests.testPaletteCommandsUseDeterministicStableIDs()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        await appStateTests.testAutoExpandDrawerOnMutationAndQuietPollingIsolation()
+        appStateTests.tearDown()
+
+        print("All AppStateTests passed successfully (19/19 tests)")
     }
 }
 #endif

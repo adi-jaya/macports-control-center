@@ -319,4 +319,41 @@ final class AppStateTests: XCTestCase {
             XCTAssertFalse(tab.icon.isEmpty)
         }
     }
+
+    func testPaletteCommandsUseDeterministicStableIDs() {
+        let state = AppState(autoRefreshOnInit: false)
+        let firstPass = state.filteredPaletteCommands(query: "").map(\.id)
+        let secondPass = state.filteredPaletteCommands(query: "").map(\.id)
+        XCTAssertFalse(firstPass.isEmpty)
+        XCTAssertEqual(firstPass, secondPass, "PaletteCommand IDs must be deterministic across renders")
+    }
+
+    func testAutoExpandDrawerOnMutationAndQuietPollingIsolation() async {
+        let state = AppState(autoRefreshOnInit: false)
+        XCTAssertTrue(state.isTerminalDrawerExpanded, "Model default must remain true")
+
+        // Simulate AppDelegate collapsing drawer on GUI launch
+        state.isTerminalDrawerExpanded = false
+        _ = await state.commandRunner.run(
+            executable: "/bin/echo",
+            arguments: ["quiet-check"],
+            label: "quiet",
+            serialized: false,
+            logToTerminal: false
+        )
+        XCTAssertFalse(state.isTerminalDrawerExpanded, "Quiet polling must not expand drawer")
+        XCTAssertTrue(state.commandRunner.terminalLines.isEmpty)
+
+        // Mutating command must auto-expand drawer
+        await state.installPackage(name: "htop")
+        XCTAssertTrue(state.isTerminalDrawerExpanded, "Mutating command must auto-expand drawer")
+
+        // Purging transient caches keeps docFiles metadata intact while freeing doc text
+        state.ensureSelectedDocLoaded()
+        XCTAssertFalse(state.selectedDocContent.isEmpty)
+        state.purgeTransientCachesForBackground()
+        XCTAssertTrue(state.selectedDocContent.isEmpty)
+        XCTAssertFalse(state.docFiles.isEmpty)
+        XCTAssertNotNil(state.selectedDoc)
+    }
 }
