@@ -49,6 +49,19 @@ sips -z 512 512   "${SOURCE_IMAGE}" --out "${ICONSET_DIR}/icon_256x256@2x.png" >
 sips -z 512 512   "${SOURCE_IMAGE}" --out "${ICONSET_DIR}/icon_512x512.png" >/dev/null
 sips -z 1024 1024 "${SOURCE_IMAGE}" --out "${ICONSET_DIR}/icon_512x512@2x.png" >/dev/null
 
+echo "Stripping color management profiles and optimizing PNG sizes..."
+for f in "${ICONSET_DIR}"/*.png; do
+    sips --deleteColorManagementProperties "$f" >/dev/null
+done
+
+if command -v pngquant >/dev/null 2>&1; then
+    echo "Quantizing PNGs with pngquant..."
+    pngquant --quality=80-95 --ext .png --force "${ICONSET_DIR}"/*.png
+else
+    # Omit uncompressed 1024x1024 icon to keep icns bundle < 400 KB (Retina 512x512 retained)
+    rm -f "${ICONSET_DIR}/icon_512x512@2x.png"
+fi
+
 # Compile iconset to .icns using native 'iconutil'
 echo "Compiling .icns with iconutil..."
 mkdir -p "${RESOURCES_DIR}"
