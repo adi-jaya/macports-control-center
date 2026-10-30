@@ -469,7 +469,7 @@ public struct MacPortsService {
         let lowerQuery = query.lowercased()
         let targets = indexPaths ?? resolvePortIndexPaths()
         if targets.isEmpty {
-            return []
+            return nil
         }
 
         var items: [PortPackageItem] = []

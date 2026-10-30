@@ -238,5 +238,13 @@ final class MacPortsServiceTests: XCTestCase {
             outdated: []
         )
         XCTAssertNil(globResult, "Glob queries must return nil to trigger CLI fallback")
+
+        let emptyTargetsResult = MacPortsService.searchPortsNativeIndex(
+            query: "php",
+            indexPaths: [],
+            installed: [:],
+            outdated: []
+        )
+        XCTAssertNil(emptyTargetsResult, "Empty targets must return nil to trigger CLI fallback")
     }
 }
