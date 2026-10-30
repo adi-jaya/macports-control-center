@@ -92,6 +92,7 @@ public final class LogFileTailer: ObservableObject {
                     attachWatcher()
                 } else {
                     stopSourceOnly()
+                    stopMissingFileTimer()
                 }
             }
         }

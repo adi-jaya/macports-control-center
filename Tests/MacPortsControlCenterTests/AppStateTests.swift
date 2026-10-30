@@ -377,6 +377,14 @@ final class AppStateTests: XCTestCase {
         // File smaller than maxBytes keeps the very first line intact
         let full = LogFileTailer.readTail(atPath: tempFile, maxBytes: 100_000)
         XCTAssertTrue(full.content.hasPrefix("2026-10-30 [error] 🚀 baris-log-panjang-ke-0\n"))
+
+        // Disabling auto-tail on missing file invalidates missing file timer cleanly
+        let tailer = LogFileTailer()
+        tailer.startWatching(path: "/non/existent/path/\(UUID().uuidString).log")
+        XCTAssertTrue(tailer.isAutoTailEnabled)
+        tailer.isAutoTailEnabled = false
+        XCTAssertFalse(tailer.isAutoTailEnabled)
+        tailer.stopWatching()
     }
 
     func testMarkdownStylerCacheHitAndClear() {
