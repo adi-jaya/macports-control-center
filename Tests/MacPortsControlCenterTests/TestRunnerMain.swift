@@ -264,6 +264,26 @@ struct TestRunnerMain {
         appStateTests.tearDown()
 
         print("All AppStateTests passed successfully (21/21 tests)")
+
+        print("Running MPButtonStyleTests...")
+        let buttonStyleTests = MPButtonStyleTests()
+        buttonStyleTests.setUp()
+        buttonStyleTests.testVariantPropertiesAndEquality()
+        buttonStyleTests.tearDown()
+
+        buttonStyleTests.setUp()
+        buttonStyleTests.testSizeMetricsAndPadding()
+        buttonStyleTests.tearDown()
+
+        buttonStyleTests.setUp()
+        buttonStyleTests.testStyleInitializationAndDefaults()
+        buttonStyleTests.tearDown()
+
+        buttonStyleTests.setUp()
+        buttonStyleTests.testViewModifierApplication()
+        buttonStyleTests.tearDown()
+
+        print("All MPButtonStyleTests passed successfully (4/4 tests)")
     }
 }
 #endif

@@ -421,7 +421,7 @@ public struct LogsView: View {
                         .font(.system(size: 12))
                     Spacer()
                     Button("Dismiss") { feedbackMessage = nil }
-                        .buttonStyle(.borderless)
+                        .mpButton(.borderless)
                         .font(.system(size: 11))
                 }
                 .padding(.horizontal, 14)
@@ -536,7 +536,7 @@ public struct LogsView: View {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 11))
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.small)
                 .help("Refresh log file")
 
@@ -549,7 +549,7 @@ public struct LogsView: View {
                     }
                     .font(.system(size: 11))
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.small)
                 .help("Truncate this log file")
 
@@ -559,7 +559,7 @@ public struct LogsView: View {
                     Image(systemName: "doc.on.doc")
                         .font(.system(size: 11))
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.small)
                 .help("Copy log contents to clipboard")
             }
@@ -593,7 +593,7 @@ public struct LogsView: View {
                                 .font(.system(size: 9))
                                 .foregroundColor(.secondary)
                         }
-                        .buttonStyle(.borderless)
+                        .mpButton(.borderless)
                     }
                 }
                 .padding(.horizontal, 6)
@@ -640,8 +640,7 @@ public struct LogsView: View {
                 }
                 .font(.system(size: 11, weight: .bold))
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
+            .mpButton(.borderedProminent, tint: .orange)
             .controlSize(.small)
         }
         .padding(.horizontal, 14)

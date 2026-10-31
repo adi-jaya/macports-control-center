@@ -678,7 +678,7 @@ public struct DocsView: View {
                                 .font(.system(size: 11))
                             Spacer()
                             Button("Dismiss") { feedbackMessage = nil }
-                                .buttonStyle(.borderless)
+                                .mpButton(.borderless)
                                 .font(.system(size: 10))
                         }
                         .padding(.horizontal, 16)
@@ -731,7 +731,7 @@ public struct DocsView: View {
                         Image(systemName: "arrow.triangle.2.circlepath")
                             .font(.system(size: 11))
                     }
-                    .buttonStyle(.borderless)
+                    .mpButton(.borderless)
                     .help("Rescan Markdown files in repository")
                 }
 
@@ -749,7 +749,7 @@ public struct DocsView: View {
                                 .font(.system(size: 10))
                                 .foregroundColor(.secondary)
                         }
-                        .buttonStyle(.borderless)
+                        .mpButton(.borderless)
                     }
                 }
                 .padding(.horizontal, 6)
@@ -847,7 +847,7 @@ public struct DocsView: View {
                     }
                     .font(.system(size: 11))
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.small)
 
                 Button(action: {
@@ -859,7 +859,7 @@ public struct DocsView: View {
                     }
                     .font(.system(size: 11))
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.small)
 
                 Button(action: {
@@ -871,7 +871,7 @@ public struct DocsView: View {
                     }
                     .font(.system(size: 11))
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.small)
             }
         }

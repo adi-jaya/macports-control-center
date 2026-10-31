@@ -150,7 +150,7 @@ public struct TerminalDrawerView: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.red)
                     }
-                    .buttonStyle(.borderless)
+                    .mpButton(.borderless)
                 }
 
                 // Clear log button
@@ -164,7 +164,7 @@ public struct TerminalDrawerView: View {
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
                 }
-                .buttonStyle(.borderless)
+                .mpButton(.borderless)
                 .disabled(runner.terminalLines.isEmpty)
             }
             .padding(.horizontal, 12)

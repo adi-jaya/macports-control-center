@@ -52,7 +52,7 @@ public struct DatabaseView: View {
                             .font(.system(size: 12))
                         Spacer()
                         Button("Dismiss") { feedbackMessage = nil }
-                            .buttonStyle(.borderless)
+                            .mpButton(.borderless)
                             .font(.system(size: 11))
                     }
                     .padding(10)
@@ -68,7 +68,7 @@ public struct DatabaseView: View {
                             .font(.system(size: 12))
                         Spacer()
                         Button("Dismiss") { errorMessage = nil }
-                            .buttonStyle(.borderless)
+                            .mpButton(.borderless)
                             .font(.system(size: 11))
                     }
                     .padding(10)
@@ -152,7 +152,7 @@ public struct DatabaseView: View {
                         Text("New Database")
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .mpButton(.borderedProminent)
                 .controlSize(.regular)
 
                 Button(action: {
@@ -161,7 +161,7 @@ public struct DatabaseView: View {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 12))
                 }
-                .buttonStyle(.borderless)
+                .mpButton(.borderless)
                 .help("Rescan MariaDB databases via /tmp/mysql.sock")
             }
         }
@@ -192,7 +192,7 @@ public struct DatabaseView: View {
                         }
                         .font(.system(size: 11))
                     }
-                    .buttonStyle(.bordered)
+                    .mpButton(.bordered)
                     .controlSize(.small)
 
                     Button(action: {
@@ -205,7 +205,7 @@ public struct DatabaseView: View {
                         }
                         .font(.system(size: 11))
                     }
-                    .buttonStyle(.bordered)
+                    .mpButton(.bordered)
                     .controlSize(.small)
 
                     if let mariaService = appState.services.first(where: { $0.name.contains("mariadb") || $0.name.contains("mysql") }) {
@@ -218,7 +218,7 @@ public struct DatabaseView: View {
                             }
                             .font(.system(size: 11))
                         }
-                        .buttonStyle(.bordered)
+                        .mpButton(.bordered)
                         .controlSize(.small)
                     }
                 }
@@ -406,7 +406,7 @@ public struct DatabaseView: View {
                         }
                         .font(.system(size: 10, weight: .semibold))
                     }
-                    .buttonStyle(.bordered)
+                    .mpButton(.bordered)
                     .controlSize(.small)
                 }
                 Spacer()
@@ -446,7 +446,7 @@ public struct DatabaseView: View {
                                 .font(.system(size: 10))
                                 .foregroundColor(.secondary)
                         }
-                        .buttonStyle(.borderless)
+                        .mpButton(.borderless)
                     }
                 }
                 .padding(.horizontal, 8)
@@ -471,7 +471,7 @@ public struct DatabaseView: View {
                         Button("Refresh Databases") {
                             Task { await appState.refreshDatabases() }
                         }
-                        .buttonStyle(.bordered)
+                        .mpButton(.bordered)
                         .controlSize(.small)
                     }
                 }
@@ -521,7 +521,7 @@ public struct DatabaseView: View {
                     }
                     .font(.system(size: 11))
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.small)
                 .help("Export database to .sql dump file using mysqldump")
 
@@ -535,7 +535,7 @@ public struct DatabaseView: View {
                     }
                     .font(.system(size: 11))
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.small)
                 .help("Import SQL file into this database")
 
@@ -548,7 +548,7 @@ public struct DatabaseView: View {
                         .font(.system(size: 11))
                         .foregroundColor(.red.opacity(0.8))
                 }
-                .buttonStyle(.borderless)
+                .mpButton(.borderless)
                 .help("Drop this database")
             }
         }
@@ -656,7 +656,7 @@ public struct CreateDatabaseSheet: View {
                         .font(.system(size: 16))
                         .foregroundColor(.secondary)
                 }
-                .buttonStyle(.borderless)
+                .mpButton(.borderless)
             }
 
             Divider()
@@ -717,7 +717,7 @@ public struct CreateDatabaseSheet: View {
                 Button("Cancel") {
                     isPresented = false
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
 
                 Spacer()
 
@@ -742,7 +742,7 @@ public struct CreateDatabaseSheet: View {
                         Text("Create Database")
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .mpButton(.borderedProminent)
                 .disabled(!isValidDbName || isCreating)
             }
         }

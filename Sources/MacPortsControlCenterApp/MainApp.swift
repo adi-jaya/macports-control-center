@@ -287,6 +287,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         window.setFrameAutosaveName("MacPortsControlCenterMainWindow")
         window.delegate = self
         window.isReleasedWhenClosed = false
+        window.tabbingMode = .disallowed
 
         let hostingView = NSHostingView(
             rootView: MainWindowView(appState: appState)
@@ -328,6 +329,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
             showMainWindow()
         }
         return true
+    }
+
+    public func applicationDidBecomeActive(_ notification: Notification) {
+        if let window = mainWindow {
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            showMainWindow()
+        }
     }
 
     // MARK: - System Main Menu

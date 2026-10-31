@@ -28,7 +28,7 @@ public struct SitesView: View {
                             .font(.system(size: 12))
                         Spacer()
                         Button("Dismiss") { feedbackMessage = nil }
-                            .buttonStyle(.borderless)
+                            .mpButton(.borderless)
                             .font(.system(size: 11))
                     }
                     .padding(10)
@@ -44,7 +44,7 @@ public struct SitesView: View {
                             .font(.system(size: 12))
                         Spacer()
                         Button("Dismiss") { errorMessage = nil }
-                            .buttonStyle(.borderless)
+                            .mpButton(.borderless)
                             .font(.system(size: 11))
                     }
                     .padding(10)
@@ -113,7 +113,7 @@ public struct SitesView: View {
                         Text("New Virtual Host")
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .mpButton(.borderedProminent)
                 .controlSize(.regular)
 
                 Button(action: {
@@ -124,7 +124,7 @@ public struct SitesView: View {
                         Text("Reload Nginx")
                     }
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.regular)
                 .help("Validates configuration syntax and reloads Nginx server")
 
@@ -134,7 +134,7 @@ public struct SitesView: View {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 12))
                 }
-                .buttonStyle(.borderless)
+                .mpButton(.borderless)
                 .help("Rescan /opt/local/etc/nginx/servers/")
             }
         }
@@ -290,7 +290,7 @@ public struct SitesView: View {
                         Text("Open Browser")
                     }
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.small)
 
                 // Open in Finder
@@ -303,7 +303,7 @@ public struct SitesView: View {
                         Text("Open Folder")
                     }
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.small)
 
                 // Fix Storage Permissions
@@ -319,7 +319,7 @@ public struct SitesView: View {
                         Text("Fix Permissions")
                     }
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.small)
                 .help("Executes chmod -R u+rwX storage bootstrap/cache")
 
@@ -333,7 +333,7 @@ public struct SitesView: View {
                         Text("Edit Conf")
                     }
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.small)
 
                 Spacer()
@@ -347,7 +347,7 @@ public struct SitesView: View {
                         .font(.system(size: 11))
                         .foregroundColor(.red)
                 }
-                .buttonStyle(.borderless)
+                .mpButton(.borderless)
                 .help("Delete virtual host file")
             }
         }
@@ -431,7 +431,7 @@ public struct NewVHostSheet: View {
                 Button("Cancel") {
                     isPresented = false
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
             }
             .padding()
 
@@ -465,7 +465,7 @@ public struct NewVHostSheet: View {
                             Button("Browse...") {
                                 chooseFolder()
                             }
-                            .buttonStyle(.bordered)
+                            .mpButton(.bordered)
                         }
                     }
 
@@ -582,7 +582,7 @@ public struct NewVHostSheet: View {
                 Button("Cancel") {
                     isPresented = false
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
 
                 Button(action: {
                     saveVirtualHost()
@@ -594,7 +594,7 @@ public struct NewVHostSheet: View {
                         Text("Create & Validate Virtual Host")
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .mpButton(.borderedProminent)
                 .disabled(rootPath.isEmpty || fileName.isEmpty || isSaving)
             }
             .padding()
@@ -724,7 +724,7 @@ public struct EditVHostSheet: View {
                 Button("Close") {
                     isPresented = false
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
             }
             .padding()
 
@@ -754,7 +754,7 @@ public struct EditVHostSheet: View {
                 Button("Cancel") {
                     isPresented = false
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
 
                 Button(action: {
                     saveChanges()
@@ -766,7 +766,7 @@ public struct EditVHostSheet: View {
                         Text("Save & Validate")
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .mpButton(.borderedProminent)
                 .disabled(isSaving)
             }
             .padding()

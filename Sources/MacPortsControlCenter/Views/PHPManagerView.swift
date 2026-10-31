@@ -28,7 +28,7 @@ public struct PHPManagerView: View {
                             .font(.system(size: 12))
                         Spacer()
                         Button("Dismiss") { feedbackMessage = nil }
-                            .buttonStyle(.borderless)
+                            .mpButton(.borderless)
                             .font(.system(size: 11))
                     }
                     .padding(10)
@@ -141,7 +141,7 @@ public struct PHPManagerView: View {
                         Text("Restart All FPM Pools")
                     }
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.regular)
 
                 Button(action: {
@@ -150,7 +150,7 @@ public struct PHPManagerView: View {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 12))
                 }
-                .buttonStyle(.borderless)
+                .mpButton(.borderless)
                 .help("Refresh PHP versions and extensions status")
             }
         }
@@ -255,7 +255,7 @@ public struct PHPManagerView: View {
                                 feedbackMessage = "Set \(item.portName) as active CLI default."
                             }
                         }
-                        .buttonStyle(.bordered)
+                        .mpButton(.bordered)
                         .controlSize(.small)
                     }
 
@@ -266,8 +266,7 @@ public struct PHPManagerView: View {
                             await appState.refreshPHPVersions()
                         }
                     }
-                    .buttonStyle(.bordered)
-                    .tint(item.isFPMRunning ? .red : .green)
+                    .mpButton(.bordered, tint: item.isFPMRunning ? .red : .green)
                     .controlSize(.small)
 
                     Spacer()
@@ -277,14 +276,14 @@ public struct PHPManagerView: View {
                             selectedVersion = item.version
                             syncTuningWithSelection()
                         }
-                        .buttonStyle(.borderedProminent)
+                        .mpButton(.borderedProminent)
                         .controlSize(.small)
                     } else {
                         Button("Select") {
                             selectedVersion = item.version
                             syncTuningWithSelection()
                         }
-                        .buttonStyle(.bordered)
+                        .mpButton(.bordered)
                         .controlSize(.small)
                     }
 
@@ -296,7 +295,7 @@ public struct PHPManagerView: View {
                             .font(.system(size: 10))
                             .foregroundColor(.red)
                     }
-                    .buttonStyle(.borderless)
+                    .mpButton(.borderless)
                     .help("Clean uninstall PHP \(item.version)")
                 }
             } else {
@@ -312,7 +311,7 @@ public struct PHPManagerView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .mpButton(.borderedProminent)
                 .controlSize(.small)
             }
         }
@@ -488,7 +487,7 @@ public struct PHPManagerView: View {
                         }
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .mpButton(.borderedProminent)
                 .disabled(isSavingTuning)
             }
         }

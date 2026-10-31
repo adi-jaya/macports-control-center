@@ -103,6 +103,7 @@ public struct MainWindowView: View {
             Button("") {
                 appState.isCommandPalettePresented.toggle()
             }
+            .buttonStyle(.plain)
             .keyboardShortcut("k", modifiers: .command)
             .opacity(0)
         )
@@ -246,7 +247,7 @@ public struct MainWindowView: View {
                 }
                 .font(.system(size: 11, weight: .medium))
             }
-            .buttonStyle(.bordered)
+            .mpButton(.bordered)
             .controlSize(.small)
 
             // Quick Action: Doctor Auto-Fix
@@ -260,7 +261,7 @@ public struct MainWindowView: View {
                     }
                     .font(.system(size: 11, weight: .medium))
                 }
-                .buttonStyle(.borderedProminent)
+                .mpButton(.borderedProminent)
                 .controlSize(.small)
             }
 
@@ -271,7 +272,7 @@ public struct MainWindowView: View {
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.system(size: 11))
             }
-            .buttonStyle(.borderless)
+            .mpButton(.borderless)
             .help("Refresh all services and configurations")
         }
         .padding(.horizontal, 14)

@@ -51,8 +51,7 @@ public struct ServicesView: View {
                             Text("Start Stack")
                         }
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.green)
+                    .mpButton(.bordered, tint: .green)
                     .help("Load Nginx and PHP 8.3 FPM")
 
                     Button(action: {
@@ -64,7 +63,7 @@ public struct ServicesView: View {
                             Text("Restart Stack")
                         }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .mpButton(.borderedProminent)
                     .help("Reload or restart Nginx and PHP 8.3 FPM")
 
                     Button(action: {
@@ -76,8 +75,7 @@ public struct ServicesView: View {
                             Text("Stop All")
                         }
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.red)
+                    .mpButton(.bordered, tint: .red)
                     .help("Unload all running MacPorts services")
 
                     Button(action: {
@@ -86,7 +84,7 @@ public struct ServicesView: View {
                         Image(systemName: "arrow.triangle.2.circlepath")
                             .font(.system(size: 12))
                     }
-                    .buttonStyle(.borderless)
+                    .mpButton(.borderless)
                     .help("Refresh services and health status")
                 }
             }
@@ -139,7 +137,7 @@ public struct ServicesView: View {
                             Text("Re-Check")
                         }
                     }
-                    .buttonStyle(.bordered)
+                    .mpButton(.bordered)
                     .controlSize(.small)
 
                     Button(action: {
@@ -151,8 +149,7 @@ public struct ServicesView: View {
                             Text("⚡ 1-Click Auto-Fix")
                         }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.orange)
+                    .mpButton(.borderedProminent, tint: .orange)
                     .controlSize(.small)
                     .help("Applies safe permissions and fixes non-compliant configurations via admin prompt")
                 }
@@ -337,8 +334,7 @@ public struct ServicesView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
-                .tint(service.isRunning ? .red : .green)
+                .mpButton(.bordered, tint: service.isRunning ? .red : .green)
                 .controlSize(.small)
 
                 if service.isRunning {
@@ -351,7 +347,7 @@ public struct ServicesView: View {
                             Text("Restart")
                         }
                     }
-                    .buttonStyle(.bordered)
+                    .mpButton(.bordered)
                     .controlSize(.small)
                     .help("Reloads service via MacPorts")
                 }
@@ -454,7 +450,7 @@ public struct ServicesView: View {
                     .font(.system(size: 11, weight: .medium))
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
+            .mpButton(.bordered)
             .controlSize(.small)
         }
         .padding(12)

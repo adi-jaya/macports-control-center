@@ -52,7 +52,7 @@ public struct PackagesView: View {
                             .font(.system(size: 12))
                         Spacer()
                         Button("Dismiss") { feedbackMessage = nil }
-                            .buttonStyle(.borderless)
+                            .mpButton(.borderless)
                             .font(.system(size: 11))
                     }
                     .padding(10)
@@ -68,7 +68,7 @@ public struct PackagesView: View {
                             .font(.system(size: 12))
                         Spacer()
                         Button("Dismiss") { errorMessage = nil }
-                            .buttonStyle(.borderless)
+                            .mpButton(.borderless)
                             .font(.system(size: 11))
                     }
                     .padding(10)
@@ -149,7 +149,7 @@ public struct PackagesView: View {
                     }
                     .font(.system(size: 11))
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.regular)
                 .help("Executes sudo -n port selfupdate to sync PortIndex")
 
@@ -167,7 +167,7 @@ public struct PackagesView: View {
                     }
                     .font(.system(size: 11))
                 }
-                .buttonStyle(.borderedProminent)
+                .mpButton(.borderedProminent)
                 .controlSize(.regular)
                 .help("Executes sudo -n port upgrade outdated")
 
@@ -185,7 +185,7 @@ public struct PackagesView: View {
                     }
                     .font(.system(size: 11))
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.regular)
                 .help("Executes sudo -n port -N uninstall leaves")
             }
@@ -225,7 +225,7 @@ public struct PackagesView: View {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 11))
                 }
-                .buttonStyle(.borderless)
+                .mpButton(.borderless)
                 .help("Rescan port select --summary")
             }
 
@@ -326,13 +326,13 @@ public struct PackagesView: View {
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }
-                    .buttonStyle(.borderless)
+                    .mpButton(.borderless)
                 }
 
                 Button("Search") {
                     triggerSearch()
                 }
-                .buttonStyle(.bordered)
+                .mpButton(.bordered)
                 .controlSize(.small)
                 .disabled(appState.isSearchingPackages)
             }
@@ -403,7 +403,7 @@ public struct PackagesView: View {
                             visibleLimit = 200
                             searchTask = Task { await appState.loadInstalledPackages() }
                         }
-                        .buttonStyle(.bordered)
+                        .mpButton(.bordered)
                         .controlSize(.small)
                     }
                 }
@@ -429,7 +429,7 @@ public struct PackagesView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
                         }
-                        .buttonStyle(.bordered)
+                        .mpButton(.bordered)
                         .padding(.top, 4)
                     }
                 }
@@ -520,7 +520,7 @@ public struct PackagesView: View {
                         }
                         .font(.system(size: 11))
                     }
-                    .buttonStyle(.borderedProminent)
+                    .mpButton(.borderedProminent)
                     .controlSize(.small)
                 } else {
                     // Upgrade Outdated
@@ -537,9 +537,8 @@ public struct PackagesView: View {
                             }
                             .font(.system(size: 11))
                         }
-                        .buttonStyle(.borderedProminent)
+                        .mpButton(.borderedProminent, tint: .orange)
                         .controlSize(.small)
-                        .tint(.orange)
                     }
 
                     // Multi-version Activate / Deactivate
@@ -553,7 +552,7 @@ public struct PackagesView: View {
                             Text("Activate")
                                 .font(.system(size: 11))
                         }
-                        .buttonStyle(.bordered)
+                        .mpButton(.bordered)
                         .controlSize(.small)
                     } else {
                         Button(action: {
@@ -565,7 +564,7 @@ public struct PackagesView: View {
                             Text("Deactivate")
                                 .font(.system(size: 11))
                         }
-                        .buttonStyle(.bordered)
+                        .mpButton(.bordered)
                         .controlSize(.small)
                     }
 
@@ -578,7 +577,7 @@ public struct PackagesView: View {
                             .font(.system(size: 11))
                             .foregroundColor(.red.opacity(0.8))
                     }
-                    .buttonStyle(.borderless)
+                    .mpButton(.borderless)
                     .help("Uninstall package")
                 }
             }

@@ -151,7 +151,7 @@ Konsultasikan dokumen berikut hanya saat pemicu (*trigger*) yang relevan aktif:
    ```bash
    TEST_RUNNER=1 /tmp/run-all-tests
    ```
-   Wajib menghasilkan seluruh 42/42 pengujian unit lulus (AppState, CommandRunner, ConfigFileService, DoctorAndDatabase, MacPortsService).
+   Wajib menghasilkan seluruh 57/57 pengujian unit lulus (AppState, CommandRunner, ConfigFileService, DoctorAndDatabase, MacPortsService, MPButtonStyle).
 3. **Completion Criterion:**
    - Bundel aplikasi valid dan dapat dijalankan: `open "build/MacPorts Control Center.app"` atau `open -a "MacPorts Control Center"`
    - Seluruh test suite lulus tanpa kegagalan (exit code 0).
