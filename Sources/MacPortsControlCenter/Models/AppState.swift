@@ -950,9 +950,7 @@ public final class AppState: ObservableObject {
 
     public func setupMkcert() async {
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port install mkcert", label: "install-mkcert")
-        let activateScript = "tell application \"Terminal\" to activate"
-        let terminalScript = "tell application \"Terminal\" to do script \"echo '=== Setup mkcert Root CA ===' && mkcert -install\""
-        _ = await commandRunner.run(executable: "/usr/bin/osascript", arguments: ["-e", activateScript, "-e", terminalScript], label: "mkcert-terminal-install")
+        commandRunner.openExternalTerminal(command: "echo '=== Setup mkcert Root CA ===' && mkcert -install")
         invalidatePackageCaches()
     }
 

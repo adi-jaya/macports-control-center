@@ -438,4 +438,35 @@ public final class CommandRunner: ObservableObject {
             stderr: stderrString
         )
     }
+
+    // MARK: - External Terminal Helper
+
+    /// Opens native macOS Terminal.app and optionally executes a command interactively.
+    @discardableResult
+    public static func openExternalTerminal(command: String? = nil) -> Bool {
+        var script = "tell application \"Terminal\"\nactivate\n"
+        if let cmd = command, !cmd.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let escaped = cmd.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+            script += "do script \"\(escaped)\"\n"
+        } else {
+            script += "do script \"\"\n"
+        }
+        script += "end tell"
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", script]
+        do {
+            try process.run()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Convenience instance method to open native Terminal.app
+    @discardableResult
+    public func openExternalTerminal(command: String? = nil) -> Bool {
+        Self.openExternalTerminal(command: command)
+    }
 }

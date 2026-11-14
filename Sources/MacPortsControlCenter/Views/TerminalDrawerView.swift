@@ -172,6 +172,20 @@ public struct TerminalDrawerView: View {
                     .mpButton(.borderless)
                 }
 
+                // Open in External Terminal button
+                Button(action: {
+                    runner.openExternalTerminal()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.forward.app")
+                        Text("Terminal")
+                    }
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                }
+                .mpButton(.borderless)
+                .help("Open external macOS Terminal.app")
+
                 // Clear log button
                 Button(action: {
                     runner.clearLog()
