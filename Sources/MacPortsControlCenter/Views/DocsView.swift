@@ -538,14 +538,12 @@ public final class DocsScrollView: NSScrollView {
         guard contentWidth > 50 else { return }
 
         let targetWidth = contentWidth - textView.textContainerInset.width * 2
-        if abs(textContainer.containerSize.width - targetWidth) > 1.0 {
-            textContainer.containerSize = NSSize(width: targetWidth, height: CGFloat.greatestFiniteMagnitude)
-            textView.frame.size.width = contentWidth
-            layoutManager.ensureLayout(for: textContainer)
-            let usedRect = layoutManager.usedRect(for: textContainer)
-            let calculatedHeight = max(usedRect.height + textView.textContainerInset.height * 2, contentSize.height)
-            textView.frame.size.height = calculatedHeight
-        }
+        textContainer.containerSize = NSSize(width: targetWidth, height: CGFloat.greatestFiniteMagnitude)
+        textView.frame.size.width = contentWidth
+        layoutManager.ensureLayout(for: textContainer)
+        let usedRect = layoutManager.usedRect(for: textContainer)
+        let calculatedHeight = max(usedRect.height + textView.textContainerInset.height * 2, contentSize.height)
+        textView.frame.size.height = calculatedHeight
     }
 }
 
@@ -596,6 +594,8 @@ public struct MarkdownTextViewRepresentable: NSViewRepresentable {
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
 
         scrollView.documentView = textView
         // Do not set coordinator.currentText so updateNSView executes cleanly on initial mount
@@ -616,7 +616,7 @@ public struct MarkdownTextViewRepresentable: NSViewRepresentable {
             textView.scroll(NSPoint.zero)
         }
 
-        if widthChanged {
+        if needsTextUpdate || widthChanged {
             context.coordinator.lastWidth = nsView.contentSize.width
             if let layoutManager = textView.layoutManager, let textContainer = textView.textContainer {
                 let contentWidth = max(100.0, nsView.contentSize.width)

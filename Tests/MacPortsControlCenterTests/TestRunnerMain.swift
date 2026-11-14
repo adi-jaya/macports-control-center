@@ -263,7 +263,19 @@ struct TestRunnerMain {
         appStateTests.testMarkdownStylerCacheHitAndClear()
         appStateTests.tearDown()
 
-        print("All AppStateTests passed successfully (21/21 tests)")
+        appStateTests.setUp()
+        appStateTests.testInitialDocumentationContentIsLoadedAndCanScroll()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        appStateTests.testTerminalTextViewAllowsScrollingWhenLinesStreamIn()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
+        appStateTests.testLogsTextViewAllowsScrollingWhenLinesLoaded()
+        appStateTests.tearDown()
+
+        print("All AppStateTests passed successfully (24/24 tests)")
 
         print("Running MPButtonStyleTests...")
         let buttonStyleTests = MPButtonStyleTests()

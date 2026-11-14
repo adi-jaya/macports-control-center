@@ -14,6 +14,7 @@ public struct TerminalTextViewRepresentable: NSViewRepresentable {
     public class Coordinator {
         var lastGeneration: Int = -1
         var renderedLineCount: Int = 0
+        var lastWidth: CGFloat = 0
         let defaultAttributes: [NSAttributedString.Key: Any] = [
             .foregroundColor: NSColor(red: 226/255.0, green: 232/255.0, blue: 240/255.0, alpha: 1.0), // Slate-200 #E2E8F0
             .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
@@ -51,6 +52,8 @@ public struct TerminalTextViewRepresentable: NSViewRepresentable {
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
 
         scrollView.documentView = textView
         return scrollView
@@ -58,9 +61,12 @@ public struct TerminalTextViewRepresentable: NSViewRepresentable {
 
     public func updateNSView(_ nsView: NSScrollView, context: Context) {
         guard let textView = nsView.documentView as? NSTextView,
-              let textStorage = textView.textStorage else { return }
+              let textStorage = textView.textStorage,
+              let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer else { return }
 
         let coordinator = context.coordinator
+        var didChangeText = false
 
         if coordinator.lastGeneration != generation || lines.count < coordinator.renderedLineCount {
             let fullText = lines.joined(separator: "\n")
@@ -68,9 +74,7 @@ public struct TerminalTextViewRepresentable: NSViewRepresentable {
             textStorage.setAttributedString(attributed)
             coordinator.lastGeneration = generation
             coordinator.renderedLineCount = lines.count
-            if !fullText.isEmpty {
-                textView.scrollToEndOfDocument(nil)
-            }
+            didChangeText = true
         } else if lines.count > coordinator.renderedLineCount {
             let newLines = lines[coordinator.renderedLineCount..<lines.count]
             let prefix = coordinator.renderedLineCount > 0 ? "\n" : ""
@@ -82,7 +86,22 @@ public struct TerminalTextViewRepresentable: NSViewRepresentable {
             textStorage.endEditing()
 
             coordinator.renderedLineCount = lines.count
-            textView.scrollToEndOfDocument(nil)
+            didChangeText = true
+        }
+
+        let widthChanged = (abs(coordinator.lastWidth - nsView.contentSize.width) > 1.0)
+        if didChangeText || widthChanged {
+            coordinator.lastWidth = nsView.contentSize.width
+            let contentWidth = max(50.0, nsView.contentSize.width)
+            textView.frame.size.width = contentWidth
+            layoutManager.ensureLayout(for: textContainer)
+            let usedRect = layoutManager.usedRect(for: textContainer)
+            let calculatedHeight = max(usedRect.height, nsView.contentSize.height)
+            textView.frame.size.height = calculatedHeight
+
+            if didChangeText && !lines.isEmpty {
+                textView.scrollToEndOfDocument(nil)
+            }
         }
     }
 }

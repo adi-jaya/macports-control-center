@@ -5,6 +5,7 @@ import XCTest
 import Foundation
 #endif
 import AppKit
+import SwiftUI
 
 @MainActor
 final class AppStateTests: XCTestCase {
@@ -396,5 +397,80 @@ final class AppStateTests: XCTestCase {
         MarkdownStyler.clearCache()
         let third = MarkdownStyler.cachedStyle(for: "doc-test", markdown: md)
         XCTAssertFalse(first === third, "clearCache must evict cached NSAttributedString instances")
+    }
+
+    func testInitialDocumentationContentIsLoadedAndCanScroll() {
+        let state = AppState(autoRefreshOnInit: false)
+        XCTAssertNotNil(state.selectedDoc)
+        XCTAssertFalse(state.selectedDocContent.isEmpty, "Initial selectedDocContent should be loaded on init so first documentation view is immediately populated")
+
+        let docView = MarkdownTextViewRepresentable(docKey: state.selectedDoc?.filePath ?? "README.md", markdownText: state.selectedDocContent)
+        let host = NSHostingView(rootView: docView)
+        host.frame = NSRect(x: 0, y: 0, width: 800, height: 500)
+        host.layout()
+
+        func findScrollView(in view: NSView) -> NSScrollView? {
+            if let sv = view as? NSScrollView { return sv }
+            for sub in view.subviews {
+                if let found = findScrollView(in: sub) { return found }
+            }
+            return nil
+        }
+
+        guard let scrollView = findScrollView(in: host), let textView = scrollView.documentView as? NSTextView else {
+            XCTFail("Must contain a DocsScrollView and NSTextView")
+            return
+        }
+
+        XCTAssertTrue(scrollView.hasVerticalScroller)
+        XCTAssertTrue(textView.frame.height > scrollView.contentSize.height, "Text view frame height must expand beyond scroll view content height to allow vertical scrolling on first open")
+    }
+
+    func testTerminalTextViewAllowsScrollingWhenLinesStreamIn() {
+        let sampleLines = (1...80).map { "Terminal log output line \($0)" }
+        let termView = TerminalTextViewRepresentable(lines: sampleLines, generation: 1)
+        let host = NSHostingView(rootView: termView)
+        host.frame = NSRect(x: 0, y: 0, width: 800, height: 200)
+        host.layout()
+
+        func findScrollView(in view: NSView) -> NSScrollView? {
+            if let sv = view as? NSScrollView { return sv }
+            for sub in view.subviews {
+                if let found = findScrollView(in: sub) { return found }
+            }
+            return nil
+        }
+
+        guard let scrollView = findScrollView(in: host), let textView = scrollView.documentView as? NSTextView else {
+            XCTFail("Must contain NSScrollView and NSTextView")
+            return
+        }
+
+        XCTAssertTrue(scrollView.hasVerticalScroller)
+        XCTAssertTrue(textView.frame.height > scrollView.contentSize.height, "Terminal text view frame height must expand beyond scroll view content height to allow scrolling")
+    }
+
+    func testLogsTextViewAllowsScrollingWhenLinesLoaded() {
+        let sampleLog = (1...120).map { "2026/11/14 [error] line \($0)" }.joined(separator: "\n")
+        let logsView = LogsTextViewRepresentable(text: sampleLog, autoScroll: true)
+        let host = NSHostingView(rootView: logsView)
+        host.frame = NSRect(x: 0, y: 0, width: 800, height: 500)
+        host.layout()
+
+        func findScrollView(in view: NSView) -> NSScrollView? {
+            if let sv = view as? NSScrollView { return sv }
+            for sub in view.subviews {
+                if let found = findScrollView(in: sub) { return found }
+            }
+            return nil
+        }
+
+        guard let scrollView = findScrollView(in: host), let textView = scrollView.documentView as? NSTextView else {
+            XCTFail("Must contain NSScrollView and NSTextView")
+            return
+        }
+
+        XCTAssertTrue(scrollView.hasVerticalScroller)
+        XCTAssertTrue(textView.frame.height > scrollView.contentSize.height, "Logs text view frame height must expand beyond scroll view content height to allow scrolling")
     }
 }

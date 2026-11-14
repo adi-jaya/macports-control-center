@@ -204,6 +204,7 @@ public final class AppState: ObservableObject {
         self.docFiles = items
         if selectedDoc == nil, let first = items.first {
             selectedDoc = first
+            selectedDocContent = loadDocContent(doc: first)
         }
     }
 

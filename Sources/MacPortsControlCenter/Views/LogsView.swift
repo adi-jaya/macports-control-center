@@ -35,6 +35,14 @@ public struct LogsTextViewRepresentable: NSViewRepresentable {
         self.autoScroll = autoScroll
     }
 
+    public class Coordinator {
+        var lastWidth: CGFloat = 0
+    }
+
+    public func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     public func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
         scrollView.drawsBackground = true
@@ -62,16 +70,34 @@ public struct LogsTextViewRepresentable: NSViewRepresentable {
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
 
         scrollView.documentView = textView
         return scrollView
     }
 
     public func updateNSView(_ nsView: NSScrollView, context: Context) {
-        guard let textView = nsView.documentView as? NSTextView else { return }
-        if textView.string != text {
+        guard let textView = nsView.documentView as? NSTextView,
+              let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer else { return }
+
+        let textChanged = (textView.string != text)
+        let widthChanged = (abs(context.coordinator.lastWidth - nsView.contentSize.width) > 1.0)
+
+        if textChanged {
             textView.string = text
-            if autoScroll {
+        }
+
+        if textChanged || widthChanged {
+            context.coordinator.lastWidth = nsView.contentSize.width
+            let contentWidth = max(50.0, nsView.contentSize.width)
+            textView.frame.size.width = contentWidth
+            layoutManager.ensureLayout(for: textContainer)
+            let usedRect = layoutManager.usedRect(for: textContainer)
+            textView.frame.size.height = max(usedRect.height, nsView.contentSize.height)
+
+            if textChanged && autoScroll {
                 textView.scrollToEndOfDocument(nil)
             }
         }
