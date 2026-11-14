@@ -932,6 +932,41 @@ public final class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Ecosystem Utilities Status Detection
+    public var isDnsmasqInstalled: Bool {
+        packages.contains(where: { $0.name == "dnsmasq" && $0.isActive }) ||
+        FileManager.default.fileExists(atPath: "/opt/local/sbin/dnsmasq")
+    }
+
+    public var isDnsmasqRunning: Bool {
+        services.first(where: { $0.name == "dnsmasq" })?.isRunning == true
+    }
+
+    public var isMkcertInstalled: Bool {
+        packages.contains(where: { $0.name == "mkcert" && $0.isActive }) ||
+        FileManager.default.fileExists(atPath: "/opt/local/bin/mkcert")
+    }
+
+    public var isRedisInstalled: Bool {
+        packages.contains(where: { $0.name == "redis" && $0.isActive }) ||
+        FileManager.default.fileExists(atPath: "/opt/local/bin/redis-server")
+    }
+
+    public var isRedisRunning: Bool {
+        services.first(where: { $0.name == "redis" })?.isRunning == true
+    }
+
+    public var isFnmInstalled: Bool {
+        packages.contains(where: { $0.name == "fnm" && $0.isActive }) ||
+        FileManager.default.fileExists(atPath: "/opt/local/bin/fnm")
+    }
+
+    public var isComposerInstalled: Bool {
+        packages.contains(where: { $0.name == "composer" && $0.isActive }) ||
+        FileManager.default.fileExists(atPath: "/opt/local/bin/composer") ||
+        FileManager.default.fileExists(atPath: ("~/.local/bin/composer" as NSString).expandingTildeInPath)
+    }
+
     // MARK: - Ecosystem Utilities Actions
     public func setupDnsmasq() async {
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port install dnsmasq", label: "install-dnsmasq")

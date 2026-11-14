@@ -379,7 +379,9 @@ public struct ServicesView: View {
                     title: "dnsmasq (*.test DNS)",
                     icon: "network",
                     description: "Automatic local resolver for *.test domains pointing to 127.0.0.1 without editing /etc/hosts.",
-                    buttonTitle: "Setup & Start dnsmasq",
+                    statusText: appState.isDnsmasqRunning ? "● Running" : (appState.isDnsmasqInstalled ? "● Installed" : "Not Installed"),
+                    statusColor: appState.isDnsmasqRunning ? .green : (appState.isDnsmasqInstalled ? .blue : .secondary),
+                    buttonTitle: appState.isDnsmasqRunning ? "Restart dnsmasq" : (appState.isDnsmasqInstalled ? "Start dnsmasq" : "Setup & Start dnsmasq"),
                     action: {
                         Task { await appState.setupDnsmasq() }
                     }
@@ -390,7 +392,9 @@ public struct ServicesView: View {
                     title: "mkcert (Local HTTPS)",
                     icon: "lock.shield",
                     description: "Zero-config local CA and SSL certificate generation for *.test and localhost.",
-                    buttonTitle: "Install & Setup mkcert",
+                    statusText: appState.isMkcertInstalled ? "● Installed" : "Not Installed",
+                    statusColor: appState.isMkcertInstalled ? .green : .secondary,
+                    buttonTitle: appState.isMkcertInstalled ? "Re-setup mkcert CA" : "Install & Setup mkcert",
                     action: {
                         Task { await appState.setupMkcert() }
                     }
@@ -401,18 +405,23 @@ public struct ServicesView: View {
                     title: "Redis Server",
                     icon: "bolt.horizontal",
                     description: "In-memory database for Laravel caching, session management, and queued background jobs.",
-                    buttonTitle: "Install / Start Redis",
+                    statusText: appState.isRedisRunning ? "● Running" : (appState.isRedisInstalled ? "● Stopped" : "Not Installed"),
+                    statusColor: appState.isRedisRunning ? .green : (appState.isRedisInstalled ? .orange : .secondary),
+                    buttonTitle: appState.isRedisRunning ? "Restart Redis" : (appState.isRedisInstalled ? "Start Redis" : "Install / Start Redis"),
                     action: {
                         Task { await appState.setupRedis() }
                     }
                 )
 
                 // fnm & Composer Tool
+                let fnmAndComposerReady = appState.isFnmInstalled && appState.isComposerInstalled
                 toolCard(
                     title: "Node.js (fnm) & Composer",
                     icon: "shippingbox",
                     description: "Fast Node Manager (fnm) and PHP Composer dependency manager for MacPorts dev workflow.",
-                    buttonTitle: "Install fnm & Composer",
+                    statusText: fnmAndComposerReady ? "● Installed" : (appState.isFnmInstalled || appState.isComposerInstalled ? "● Partial" : "Not Installed"),
+                    statusColor: fnmAndComposerReady ? .green : .secondary,
+                    buttonTitle: fnmAndComposerReady ? "Installed (Ready)" : "Install fnm & Composer",
                     action: {
                         Task { await appState.setupFnmAndComposer() }
                     }
@@ -426,6 +435,8 @@ public struct ServicesView: View {
         title: String,
         icon: String,
         description: String,
+        statusText: String,
+        statusColor: Color,
         buttonTitle: String,
         action: @escaping () -> Void
     ) -> some View {
@@ -437,6 +448,13 @@ public struct ServicesView: View {
                 Text(title)
                     .font(.system(size: 13, weight: .bold))
                 Spacer()
+                Text(statusText)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(statusColor)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(statusColor.opacity(0.12))
+                    .cornerRadius(4)
             }
 
             Text(description)
