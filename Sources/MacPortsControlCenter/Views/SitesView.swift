@@ -10,6 +10,8 @@ public struct SitesView: View {
     @State private var isDeleteAlertPresented: Bool = false
     @State private var feedbackMessage: String? = nil
     @State private var errorMessage: String? = nil
+    @State private var isTunnelPortSheetPresented: Bool = false
+    @State private var copiedTunnelId: String? = nil
 
     public init() {}
 
@@ -64,6 +66,10 @@ public struct SitesView: View {
             })
             .environmentObject(appState)
         }
+        .sheet(isPresented: $isTunnelPortSheetPresented) {
+            QuickTunnelPortSheet(isPresented: $isTunnelPortSheetPresented)
+                .environmentObject(appState)
+        }
         .sheet(item: $selectedVHostForEdit) { vhost in
             EditVHostSheet(vhost: vhost, isPresented: Binding(
                 get: { selectedVHostForEdit != nil },
@@ -104,6 +110,19 @@ public struct SitesView: View {
             Spacer()
 
             HStack(spacing: 8) {
+                Button(action: {
+                    isTunnelPortSheetPresented = true
+                }) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("Tunnel Port...")
+                    }
+                }
+                .mpButton(.bordered)
+                .controlSize(.regular)
+                .help("Expose ad-hoc local port (Vite, Next.js, FastAPI) to public URL")
+
                 Button(action: {
                     isNewVHostSheetPresented = true
                 }) {
@@ -176,7 +195,10 @@ public struct SitesView: View {
 
     // MARK: - VHost Card View
     private func vhostCard(_ vhost: VHostItem) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let tunnelId = "\(vhost.listenPort)_\(vhost.fileName.replacingOccurrences(of: " ", with: "_"))"
+        let activeTunnel = appState.activeTunnels[tunnelId]
+
+        return VStack(alignment: .leading, spacing: 10) {
             // Top Row: Server Name, Port & Badges
             HStack(spacing: 8) {
                 // Host / Domain Icon
@@ -276,6 +298,92 @@ public struct SitesView: View {
                 .cornerRadius(4)
             }
 
+            // Active Tunnel Banner
+            if let tunnel = activeTunnel {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(tunnel.status == .active ? Color.green : (tunnel.status == .starting ? Color.orange : Color.red))
+                            .frame(width: 8, height: 8)
+                        Text(tunnel.status == .active ? "Live Tunnel" : (tunnel.status == .starting ? "Starting Tunnel..." : "Tunnel Error"))
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(tunnel.status == .active ? .green : (tunnel.status == .starting ? .orange : .red))
+
+                        Spacer()
+
+                        Button(action: {
+                            appState.stopTunnel(tunnelId: tunnelId)
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "stop.fill")
+                                Text("Stop Tunnel")
+                            }
+                        }
+                        .mpButton(.borderless)
+                        .font(.system(size: 11))
+                        .foregroundColor(.red)
+                    }
+
+                    if let publicUrl = tunnel.publicUrl {
+                        HStack(spacing: 8) {
+                            Text(publicUrl)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.accentColor)
+                                .lineLimit(1)
+
+                            Spacer()
+
+                            Button(action: {
+                                let pasteboard = NSPasteboard.general
+                                pasteboard.clearContents()
+                                pasteboard.setString(publicUrl, forType: .string)
+                                copiedTunnelId = tunnelId
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                    if copiedTunnelId == tunnelId {
+                                        copiedTunnelId = nil
+                                    }
+                                }
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: copiedTunnelId == tunnelId ? "checkmark" : "doc.on.doc")
+                                    Text(copiedTunnelId == tunnelId ? "Copied" : "Copy URL")
+                                }
+                            }
+                            .mpButton(.bordered)
+                            .controlSize(.small)
+
+                            Button(action: {
+                                if let url = URL(string: publicUrl) {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "safari")
+                                    Text("Open")
+                                }
+                            }
+                            .mpButton(.bordered)
+                            .controlSize(.small)
+                        }
+                    } else if let err = tunnel.errorMessage {
+                        Text(err)
+                            .font(.system(size: 11))
+                            .foregroundColor(.red)
+                    } else {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                            Text("Requesting Cloudflare tunnel URL...")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(10)
+                .background(Color.blue.opacity(0.08))
+                .cornerRadius(6)
+            }
+
             Divider()
 
             // Bottom Actions Bar
@@ -335,6 +443,22 @@ public struct SitesView: View {
                 }
                 .mpButton(.bordered)
                 .controlSize(.small)
+
+                // Cloudflare Quick Tunnel (when not active)
+                if activeTunnel == nil {
+                    Button(action: {
+                        appState.startTunnel(for: vhost)
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "antenna.radiowaves.left.and.right")
+                                .font(.system(size: 11))
+                            Text("Tunnel")
+                        }
+                    }
+                    .mpButton(.bordered)
+                    .controlSize(.small)
+                    .help("Expose this virtual host via Cloudflare Quick Tunnel")
+                }
 
                 Spacer()
 
@@ -793,5 +917,100 @@ public struct EditVHostSheet: View {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+}
+
+// MARK: - Quick Tunnel Port Sheet
+public struct QuickTunnelPortSheet: View {
+    @EnvironmentObject public var appState: AppState
+    @Binding public var isPresented: Bool
+
+    @State private var port: String = ""
+    @State private var label: String = ""
+    @State private var errorMessage: String? = nil
+
+    public init(isPresented: Binding<Bool>) {
+        self._isPresented = isPresented
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header
+            HStack {
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .font(.system(size: 18))
+                    .foregroundColor(.accentColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Tunnel Custom Port")
+                        .font(.system(size: 15, weight: .bold))
+                    Text("Expose any local service port to the internet via Cloudflare Quick Tunnel")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+
+            Divider()
+
+            // Inputs
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Local Port:")
+                        .font(.system(size: 12, weight: .medium))
+                    TextField("e.g. 5173, 3000, 8000", text: $port)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Label (optional):")
+                        .font(.system(size: 12, weight: .medium))
+                    TextField("e.g. Vite SPA, Next.js Dev", text: $label)
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+
+            if let err = errorMessage {
+                Text(err)
+                    .font(.system(size: 11))
+                    .foregroundColor(.red)
+            }
+
+            Divider()
+
+            // Actions
+            HStack {
+                Spacer()
+
+                Button("Cancel") {
+                    isPresented = false
+                }
+                .mpButton(.bordered)
+
+                Button("Start Tunnel") {
+                    startTunnel()
+                }
+                .mpButton(.borderedProminent)
+                .disabled(port.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 440)
+    }
+
+    private func startTunnel() {
+        let cleanPort = port.trimmingCharacters(in: .whitespaces)
+        guard let portInt = Int(cleanPort), portInt > 0, portInt <= 65535 else {
+            errorMessage = "Please enter a valid port number between 1 and 65535."
+            return
+        }
+        let cleanLabel = label.trimmingCharacters(in: .whitespaces)
+        appState.startTunnel(
+            port: cleanPort,
+            label: cleanLabel.isEmpty ? "Port \(cleanPort)" : cleanLabel,
+            isVHost: false,
+            isSSL: false,
+            hostHeader: "localhost"
+        )
+        isPresented = false
     }
 }
