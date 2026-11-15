@@ -264,6 +264,10 @@ struct TestRunnerMain {
         appStateTests.tearDown()
 
         appStateTests.setUp()
+        await appStateTests.testSetupMkcertUsesOsascriptAdminCommand()
+        appStateTests.tearDown()
+
+        appStateTests.setUp()
         await appStateTests.testDatabaseEngineInstallAndLifecycle()
         appStateTests.tearDown()
 
@@ -319,7 +323,7 @@ struct TestRunnerMain {
         appStateTests.testDerivePHPVersionsDetectsAdditionalExtensions()
         appStateTests.tearDown()
 
-        print("All AppStateTests passed successfully (25/25 tests)")
+        print("All AppStateTests passed successfully (26/26 tests)")
 
         print("Running MPButtonStyleTests...")
         let buttonStyleTests = MPButtonStyleTests()

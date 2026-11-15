@@ -194,6 +194,15 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(ranOsascript, "Expected setupDnsmasq to use osascript for /etc/resolver/test")
     }
 
+    func testSetupMkcertUsesOsascriptAdminCommand() async {
+        let state = AppState(autoRefreshOnInit: false)
+        await state.setupMkcert()
+        let ranOsascript = state.commandRunner.terminalLines.contains { line in
+            line.contains("osascript") && line.contains("mkcert -install")
+        }
+        XCTAssertTrue(ranOsascript, "Expected setupMkcert to use osascript for mkcert -install")
+    }
+
     // MARK: - Task 7 Views & Actions Tests
 
     func testDatabaseEngineInstallAndLifecycle() async {
