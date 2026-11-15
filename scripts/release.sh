@@ -192,17 +192,21 @@ fi
 echo -e "${BOLD}[4/7] Updating Resources/Info.plist version metadata...${NC}"
 CURRENT_SHORT_VER="$(plutil -extract CFBundleShortVersionString raw "${INFO_PLIST}" 2>/dev/null || echo "")"
 CURRENT_BUILD_NUM="$(plutil -extract CFBundleVersion raw "${INFO_PLIST}" 2>/dev/null || echo "1")"
-NEXT_BUILD_NUM=$((CURRENT_BUILD_NUM + 1))
 
-echo "      Current: CFBundleShortVersionString=${CURRENT_SHORT_VER}, CFBundleVersion=${CURRENT_BUILD_NUM}"
-echo "      Target:  CFBundleShortVersionString=${CLEAN_VERSION}, CFBundleVersion=${NEXT_BUILD_NUM}"
+if [ "${CURRENT_SHORT_VER}" != "${CLEAN_VERSION}" ]; then
+    NEXT_BUILD_NUM=$((CURRENT_BUILD_NUM + 1))
+    echo "      Current: CFBundleShortVersionString=${CURRENT_SHORT_VER}, CFBundleVersion=${CURRENT_BUILD_NUM}"
+    echo "      Target:  CFBundleShortVersionString=${CLEAN_VERSION}, CFBundleVersion=${NEXT_BUILD_NUM}"
 
-if [ "${DRY_RUN}" -eq 0 ]; then
-    plutil -replace CFBundleShortVersionString -string "${CLEAN_VERSION}" "${INFO_PLIST}"
-    plutil -replace CFBundleVersion -string "${NEXT_BUILD_NUM}" "${INFO_PLIST}"
-    echo -e "${GREEN}      Info.plist updated.${NC}"
+    if [ "${DRY_RUN}" -eq 0 ]; then
+        plutil -replace CFBundleShortVersionString -string "${CLEAN_VERSION}" "${INFO_PLIST}"
+        plutil -replace CFBundleVersion -string "${NEXT_BUILD_NUM}" "${INFO_PLIST}"
+        echo -e "${GREEN}      Info.plist updated.${NC}"
+    else
+        echo -e "${YELLOW}      [Dry-run] Info.plist modification skipped.${NC}"
+    fi
 else
-    echo -e "${YELLOW}      [Dry-run] Info.plist modification skipped.${NC}"
+    echo "      Info.plist is already at version ${CLEAN_VERSION} (Build: ${CURRENT_BUILD_NUM})."
 fi
 
 # 5. Compile Application Bundle
