@@ -247,4 +247,51 @@ final class MacPortsServiceTests: XCTestCase {
         )
         XCTAssertNil(emptyTargetsResult, "Empty targets must return nil to trigger CLI fallback")
     }
+
+    func testDiscoverPHPExtensionsSeparatesStandardAndAdditional() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let php83IniDir = tempDir.appendingPathComponent("php83")
+        try FileManager.default.createDirectory(at: php83IniDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // Create some .ini files:
+        // mysql.ini (standard subport)
+        try "extension=mysql.so".write(to: php83IniDir.appendingPathComponent("mysql.ini"), atomically: true, encoding: .utf8)
+        // custom_ext.ini (extra ini, not in standard subports)
+        try "extension=custom_ext.so".write(to: php83IniDir.appendingPathComponent("custom_ext.ini"), atomically: true, encoding: .utf8)
+        // .turd_php83 (hidden non-ini file)
+        try "".write(to: php83IniDir.appendingPathComponent(".turd_php83"), atomically: true, encoding: .utf8)
+
+        let installedNames: Set<String> = [
+            "php83",
+            "php83-fpm", // non-extension SAPI
+            "php83-cgi", // non-extension SAPI
+            "php83-curl", // standard subport
+            "php83-mysql", // standard subport
+            "php83-mongodb", // extra MacPorts subport
+            "php83-amqp" // extra MacPorts subport
+        ]
+
+        let (standard, additional) = MacPortsService.discoverPHPExtensions(
+            portName: "php83",
+            installedNames: installedNames,
+            iniDirectoryBase: tempDir.path
+        )
+
+        // Standard subports should have curl and mysql
+        XCTAssertTrue(standard.contains("curl"))
+        XCTAssertTrue(standard.contains("mysql"))
+        XCTAssertFalse(standard.contains("fpm"))
+        XCTAssertFalse(standard.contains("cgi"))
+        XCTAssertFalse(standard.contains("mongodb"))
+
+        // Additional should contain mongodb, amqp, and custom_ext (from ini)
+        XCTAssertTrue(additional.contains("mongodb"))
+        XCTAssertTrue(additional.contains("amqp"))
+        XCTAssertTrue(additional.contains("custom_ext"))
+        XCTAssertFalse(additional.contains("curl"))
+        XCTAssertFalse(additional.contains("mysql"))
+        XCTAssertFalse(additional.contains("fpm"))
+        XCTAssertFalse(additional.contains("cgi"))
+    }
 }

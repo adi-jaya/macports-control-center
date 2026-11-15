@@ -154,6 +154,37 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(ranLeaves, "Expected uninstallPHPVersion to clean leaves")
     }
 
+    func testDerivePHPVersionsDetectsAdditionalExtensions() {
+        let state = AppState(autoRefreshOnInit: false)
+        let installed: Set<String> = [
+            "php83",
+            "php83-curl",
+            "php83-fpm",
+            "php83-mongodb",
+            "php83-amqp"
+        ]
+
+        let versions = state.derivePHPVersions(
+            psOutput: "php83-fpm running",
+            installedNames: installed,
+            defaultPHP: "php83",
+            iniDirectoryBase: "/tmp/non_existent_dir_for_test"
+        )
+
+        let php83 = versions.first(where: { $0.version == "8.3" })
+        XCTAssertNotNil(php83)
+        XCTAssertEqual(php83?.isInstalled, true)
+        XCTAssertEqual(php83?.isFPMRunning, true)
+        XCTAssertEqual(php83?.isCLIDefault, true)
+
+        // Standard: curl; Additional: amqp, mongodb; Total: 3
+        XCTAssertEqual(php83?.additionalExtensions, ["amqp", "mongodb"])
+        XCTAssertEqual(php83?.installedExtensions.count, 3)
+        XCTAssertTrue(php83?.installedExtensions.contains("curl") == true)
+        XCTAssertTrue(php83?.installedExtensions.contains("mongodb") == true)
+        XCTAssertTrue(php83?.installedExtensions.contains("amqp") == true)
+    }
+
     func testSetupDnsmasqUsesOsascriptAdminCommand() async {
         let state = AppState(autoRefreshOnInit: false)
         await state.setupDnsmasq()

@@ -475,7 +475,12 @@ public final class AppState: ObservableObject {
         )
     }
 
-    private func derivePHPVersions(psOutput: String, installedNames: Set<String>, defaultPHP: String) -> [PHPVersionItem] {
+    func derivePHPVersions(
+        psOutput: String,
+        installedNames: Set<String>,
+        defaultPHP: String,
+        iniDirectoryBase: String = "/opt/local/var/db"
+    ) -> [PHPVersionItem] {
         let supportedVersions: [(version: String, portName: String, fpmPort: Int)] = [
             ("8.1", "php81", 9081),
             ("8.2", "php82", 9082),
@@ -491,13 +496,13 @@ public final class AppState: ObservableObject {
             let isFPMRunning = psOutput.contains("\(entry.portName)-fpm") ||
                                (psOutput.contains("php-fpm") && psOutput.contains(entry.portName))
 
-            var extensions = Set<String>()
-            for subport in MacPortsService.supportedPHPExtensionSubports {
-                let pkgName = "\(entry.portName)-\(subport)"
-                if installedNames.contains(pkgName) {
-                    extensions.insert(subport)
-                }
-            }
+            let discovered = MacPortsService.discoverPHPExtensions(
+                portName: entry.portName,
+                installedNames: installedNames,
+                iniDirectoryBase: iniDirectoryBase
+            )
+
+            let allExtensions = discovered.standard.union(discovered.additional)
 
             items.append(PHPVersionItem(
                 version: entry.version,
@@ -506,7 +511,8 @@ public final class AppState: ObservableObject {
                 isCLIDefault: isCLIDefault,
                 fpmPort: entry.fpmPort,
                 isFPMRunning: isFPMRunning,
-                installedExtensions: extensions
+                installedExtensions: allExtensions,
+                additionalExtensions: discovered.additional
             ))
         }
         return items
@@ -854,6 +860,19 @@ public final class AppState: ObservableObject {
         let pkg = "php\(v)-\(ext)"
         let action = install ? "install" : "uninstall"
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port \(action) \(pkg)", label: "\(action)-\(pkg)")
+        invalidatePackageCaches()
+        await refreshPHPVersions()
+    }
+
+    public func removeAdditionalPHPExtension(version: String, ext: String) async {
+        let v = version.replacingOccurrences(of: ".", with: "")
+        let pkg = "php\(v)-\(ext)"
+        let isPortPackage = cachedInstalledPorts?.contains(where: { $0.name == pkg }) ?? false
+        if isPortPackage {
+            _ = await commandRunner.runShell("sudo -n /opt/local/bin/port uninstall \(pkg)", label: "uninstall-\(pkg)")
+        } else {
+            _ = await commandRunner.runShell("sudo -n rm -f /opt/local/var/db/php\(v)/\(ext).ini", label: "remove-ini-\(pkg)")
+        }
         invalidatePackageCaches()
         await refreshPHPVersions()
     }

@@ -47,7 +47,15 @@ struct TestRunnerMain {
         }
         tests.tearDown()
 
-        print("All MacPortsServiceTests passed successfully (8/8 tests)")
+        tests.setUp()
+        do {
+            try tests.testDiscoverPHPExtensionsSeparatesStandardAndAdditional()
+        } catch {
+            fatalError("testDiscoverPHPExtensionsSeparatesStandardAndAdditional failed: \(error)")
+        }
+        tests.tearDown()
+
+        print("All MacPortsServiceTests passed successfully (9/9 tests)")
 
         print("Running CommandRunnerTests...")
         let cmdTests = CommandRunnerTests()
@@ -299,7 +307,11 @@ struct TestRunnerMain {
         appStateTests.testLogsTextViewAllowsScrollingWhenLinesLoaded()
         appStateTests.tearDown()
 
-        print("All AppStateTests passed successfully (24/24 tests)")
+        appStateTests.setUp()
+        appStateTests.testDerivePHPVersionsDetectsAdditionalExtensions()
+        appStateTests.tearDown()
+
+        print("All AppStateTests passed successfully (25/25 tests)")
 
         print("Running MPButtonStyleTests...")
         let buttonStyleTests = MPButtonStyleTests()

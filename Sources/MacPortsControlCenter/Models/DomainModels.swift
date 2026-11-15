@@ -74,6 +74,7 @@ public struct PHPVersionItem: Identifiable, Equatable, Hashable {
     public var fpmPort: Int
     public var isFPMRunning: Bool
     public var installedExtensions: Set<String>
+    public var additionalExtensions: [String]
 
     public init(
         version: String,
@@ -82,7 +83,8 @@ public struct PHPVersionItem: Identifiable, Equatable, Hashable {
         isCLIDefault: Bool,
         fpmPort: Int,
         isFPMRunning: Bool,
-        installedExtensions: Set<String> = []
+        installedExtensions: Set<String> = [],
+        additionalExtensions: [String] = []
     ) {
         self.version = version
         self.portName = portName
@@ -91,6 +93,7 @@ public struct PHPVersionItem: Identifiable, Equatable, Hashable {
         self.fpmPort = fpmPort
         self.isFPMRunning = isFPMRunning
         self.installedExtensions = installedExtensions
+        self.additionalExtensions = additionalExtensions
     }
 }
 

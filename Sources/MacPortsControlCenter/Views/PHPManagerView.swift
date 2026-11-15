@@ -385,6 +385,79 @@ public struct PHPManagerView: View {
                 }
             }
 
+            // Additional Installed Extensions (Discovered via MacPorts Packages / PECL ini)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: "puzzlepiece.extension")
+                            .font(.system(size: 12))
+                            .foregroundColor(.accentColor)
+                        Text("Additional Installed Extensions (\(activePHPItem?.additionalExtensions.count ?? 0)):")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+
+                    Spacer()
+
+                    Button(action: {
+                        appState.selectedSection = .packages
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus.magnifyingglass")
+                            Text("Browse MacPorts Packages")
+                        }
+                        .font(.system(size: 11))
+                    }
+                    .buttonStyle(.link)
+                }
+
+                if let extras = activePHPItem?.additionalExtensions, !extras.isEmpty {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+                        ForEach(extras, id: \.self) { ext in
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.green)
+                                Text(ext)
+                                    .font(.system(size: 11, design: .monospaced))
+
+                                Spacer()
+
+                                Button(action: {
+                                    guard isInstalled else { return }
+                                    Task {
+                                        await appState.removeAdditionalPHPExtension(version: selectedVersion, ext: ext)
+                                        feedbackMessage = "Uninstalled php\(selectedVersion.replacingOccurrences(of: ".", with: ""))-\(ext)."
+                                    }
+                                }) {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Uninstall php\(selectedVersion.replacingOccurrences(of: ".", with: ""))-\(ext)")
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color(NSColor.controlBackgroundColor))
+                            .cornerRadius(6)
+                        }
+                    }
+                } else {
+                    HStack {
+                        Text("No additional extensions detected. You can install extra subports (e.g. php\(selectedVersion.replacingOccurrences(of: ".", with: ""))-mongodb, php\(selectedVersion.replacingOccurrences(of: ".", with: ""))-amqp) via the MacPorts Packages tab.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    .padding(10)
+                    .background(Color(NSColor.controlBackgroundColor).opacity(0.4))
+                    .cornerRadius(6)
+                }
+            }
+            .padding(12)
+            .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
+            .cornerRadius(8)
+
             // Read-Only Built-In Core Modules
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {

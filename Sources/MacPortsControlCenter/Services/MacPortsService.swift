@@ -12,6 +12,50 @@ public struct MacPortsService {
         "bcmath", "json", "ctype", "tokenizer", "xml", "dom", "fileinfo", "phar"
     ]
 
+    public static let nonExtensionPHPSubports: Set<String> = [
+        "fpm", "cgi", "apache2handler"
+    ]
+
+    /// Discovers standard and additional PHP extensions for a given PHP port name (e.g. "php83").
+    /// Checks both MacPorts installed packages and drop-in .ini files in iniDirectoryBase/<portName>.
+    public static func discoverPHPExtensions(
+        portName: String,
+        installedNames: Set<String>,
+        iniDirectoryBase: String = "/opt/local/var/db"
+    ) -> (standard: Set<String>, additional: [String]) {
+        var standard = Set<String>()
+        for subport in supportedPHPExtensionSubports {
+            let pkgName = "\(portName)-\(subport)"
+            if installedNames.contains(pkgName) {
+                standard.insert(subport)
+            }
+        }
+
+        var additional = Set<String>()
+        let prefix = "\(portName)-"
+
+        // 1. From MacPorts installed subports (e.g. php83-mongodb)
+        for pkg in installedNames where pkg.hasPrefix(prefix) {
+            let sub = String(pkg.dropFirst(prefix.count))
+            if !supportedPHPExtensionSubports.contains(sub) && !nonExtensionPHPSubports.contains(sub) {
+                additional.insert(sub)
+            }
+        }
+
+        // 2. From drop-in .ini files (e.g. /opt/local/var/db/php83/sqlsrv.ini)
+        let iniDir = "\(iniDirectoryBase)/\(portName)"
+        if let files = try? FileManager.default.contentsOfDirectory(atPath: iniDir) {
+            for file in files where file.hasSuffix(".ini") {
+                let name = String(file.dropLast(4))
+                if !supportedPHPExtensionSubports.contains(name) && !nonExtensionPHPSubports.contains(name) {
+                    additional.insert(name)
+                }
+            }
+        }
+
+        return (standard, additional.sorted())
+    }
+
     public static let portBinary = "/opt/local/bin/port"
     public static let launchDaemonsPath = "/opt/local/etc/LaunchDaemons"
     public static let libraryLaunchDaemonsPath = "/Library/LaunchDaemons"
