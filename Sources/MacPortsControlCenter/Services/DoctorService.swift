@@ -167,6 +167,56 @@ public struct DoctorService {
         return ["-e", appleScript]
     }
 
+    /// Builds shell command to install mkcert CA into system trust store using user CAROOT
+    public static func buildMkcertInstallScript(
+        currentUser: String,
+        carootPath: String,
+        mkcertBinary: String = "/opt/local/bin/mkcert"
+    ) -> String {
+        let safeUser = currentUser.trimmingCharacters(in: .whitespacesAndNewlines)
+        let safeCaroot = carootPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let escapedUser = safeUser.replacingOccurrences(of: "'", with: "'\\''")
+        let escapedCaroot = safeCaroot.replacingOccurrences(of: "'", with: "'\\''")
+
+        return """
+        mkdir -p '\(escapedCaroot)' && \
+        CAROOT='\(escapedCaroot)' \(mkcertBinary) -install && \
+        chown -R '\(escapedUser):staff' '\(escapedCaroot)'
+        """
+    }
+
+    /// Builds privileged script to configure dnsmasq.conf and create /etc/resolver/test atomically
+    public static func buildDnsmasqPrivilegedSetupScript(
+        dnsmasqConfPath: String = "/opt/local/etc/dnsmasq.conf",
+        needsConfigAppend: Bool = true,
+        appendConfig: String = "address=/.test/127.0.0.1\nlisten-address=127.0.0.1",
+        resolverDir: String = "/etc/resolver",
+        resolverFile: String = "/etc/resolver/test",
+        nameserverEntry: String = "nameserver 127.0.0.1"
+    ) -> String {
+        let escapedConf = dnsmasqConfPath.replacingOccurrences(of: "'", with: "'\\''")
+        let escapedResolverDir = resolverDir.replacingOccurrences(of: "'", with: "'\\''")
+        let escapedResolverFile = resolverFile.replacingOccurrences(of: "'", with: "'\\''")
+        let escapedNameserver = nameserverEntry.replacingOccurrences(of: "'", with: "'\\''")
+
+        var commands: [String] = []
+
+        if needsConfigAppend {
+            let lines = appendConfig.split(separator: "\n").map { line in
+                let escapedLine = line.replacingOccurrences(of: "'", with: "'\\''")
+                return "'\(escapedLine)'"
+            }
+            if !lines.isEmpty {
+                commands.append("printf '%s\\n' \(lines.joined(separator: " ")) >> '\(escapedConf)'")
+            }
+        }
+
+        commands.append("mkdir -p '\(escapedResolverDir)'")
+        commands.append("echo '\(escapedNameserver)' > '\(escapedResolverFile)'")
+
+        return commands.joined(separator: " && ")
+    }
+
     /// Checks if `/opt/local/etc/nginx/servers` is writable by the current process
     public static func isNginxServersWritable(path: String = nginxServersPath) -> Bool {
         return FileManager.default.isWritableFile(atPath: path)

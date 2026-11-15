@@ -172,4 +172,48 @@ final class DoctorAndDatabaseTests: XCTestCase {
         let show = DatabaseService.buildShowDatabasesCommand(socketPath: "/tmp/mysql.sock")
         XCTAssertTrue(show.contains("-e 'SHOW DATABASES;'"))
     }
+
+    func testBuildMkcertInstallScriptGeneratesValidPrivilegedScript() {
+        let script = DoctorService.buildMkcertInstallScript(
+            currentUser: "adijaya",
+            carootPath: "/Users/adijaya/Library/Application Support/mkcert"
+        )
+        XCTAssertTrue(script.contains("mkdir -p '/Users/adijaya/Library/Application Support/mkcert'"))
+        XCTAssertTrue(script.contains("CAROOT='/Users/adijaya/Library/Application Support/mkcert' /opt/local/bin/mkcert -install"))
+        XCTAssertTrue(script.contains("chown -R 'adijaya:staff' '/Users/adijaya/Library/Application Support/mkcert'"))
+
+        // Escaping test with spaces or quotes
+        let quoted = DoctorService.buildMkcertInstallScript(
+            currentUser: "john doe",
+            carootPath: "/Users/john doe/Library/Application Support/mkcert"
+        )
+        XCTAssertTrue(quoted.contains("mkdir -p '/Users/john doe/Library/Application Support/mkcert'"))
+        XCTAssertTrue(quoted.contains("CAROOT='/Users/john doe/Library/Application Support/mkcert'"))
+        XCTAssertTrue(quoted.contains("chown -R 'john doe:staff'"))
+    }
+
+    func testBuildDnsmasqPrivilegedSetupScript() {
+        let scriptWithAppend = DoctorService.buildDnsmasqPrivilegedSetupScript(
+            dnsmasqConfPath: "/opt/local/etc/dnsmasq.conf",
+            needsConfigAppend: true,
+            appendConfig: "address=/.test/127.0.0.1\nlisten-address=127.0.0.1",
+            resolverDir: "/etc/resolver",
+            resolverFile: "/etc/resolver/test",
+            nameserverEntry: "nameserver 127.0.0.1"
+        )
+        XCTAssertTrue(scriptWithAppend.contains("mkdir -p '/etc/resolver'"))
+        XCTAssertTrue(scriptWithAppend.contains("echo 'nameserver 127.0.0.1' > '/etc/resolver/test'"))
+        XCTAssertTrue(scriptWithAppend.contains(">> '/opt/local/etc/dnsmasq.conf'"))
+
+        let scriptWithoutAppend = DoctorService.buildDnsmasqPrivilegedSetupScript(
+            dnsmasqConfPath: "/opt/local/etc/dnsmasq.conf",
+            needsConfigAppend: false,
+            resolverDir: "/etc/resolver",
+            resolverFile: "/etc/resolver/test",
+            nameserverEntry: "nameserver 127.0.0.1"
+        )
+        XCTAssertFalse(scriptWithoutAppend.contains(">> '/opt/local/etc/dnsmasq.conf'"))
+        XCTAssertTrue(scriptWithoutAppend.contains("mkdir -p '/etc/resolver'"))
+        XCTAssertTrue(scriptWithoutAppend.contains("echo 'nameserver 127.0.0.1' > '/etc/resolver/test'"))
+    }
 }

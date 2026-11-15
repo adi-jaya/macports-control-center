@@ -203,7 +203,15 @@ struct TestRunnerMain {
         doctorDbTests.testDatabaseServiceSpecialCharactersAndEmptyOutputs()
         doctorDbTests.tearDown()
 
-        print("All DoctorAndDatabaseTests passed successfully (6/6 tests)")
+        doctorDbTests.setUp()
+        doctorDbTests.testBuildMkcertInstallScriptGeneratesValidPrivilegedScript()
+        doctorDbTests.tearDown()
+
+        doctorDbTests.setUp()
+        doctorDbTests.testBuildDnsmasqPrivilegedSetupScript()
+        doctorDbTests.tearDown()
+
+        print("All DoctorAndDatabaseTests passed successfully (8/8 tests)")
 
         print("Running AppStateTests...")
         let appStateTests = AppStateTests()
