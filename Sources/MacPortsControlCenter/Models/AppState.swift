@@ -5,6 +5,7 @@ import Combine
 public enum NavigationSection: String, CaseIterable, Identifiable {
     case services = "services"
     case sites = "sites"
+    case tunnels = "tunnels"
     case php = "php"
     case database = "database"
     case packages = "packages"
@@ -17,6 +18,7 @@ public enum NavigationSection: String, CaseIterable, Identifiable {
         switch self {
         case .services: return "Services & Doctor"
         case .sites: return "Virtual Hosts"
+        case .tunnels: return "Tunnels"
         case .php: return "PHP Manager"
         case .database: return "Databases"
         case .packages: return "MacPorts Packages"
@@ -29,6 +31,7 @@ public enum NavigationSection: String, CaseIterable, Identifiable {
         switch self {
         case .services: return "server.rack"
         case .sites: return "globe"
+        case .tunnels: return "antenna.radiowaves.left.and.right"
         case .php: return "chevron.left.forwardslash.chevron.right"
         case .database: return "cylinder.split.1x2"
         case .packages: return "shippingbox"

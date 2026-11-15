@@ -296,6 +296,18 @@ struct TestRunnerMain {
         buttonStyleTests.tearDown()
 
         print("All MPButtonStyleTests passed successfully (4/4 tests)")
+
+        print("Running TunnelServiceTests...")
+        let tunnelTests = TunnelServiceTests()
+        tunnelTests.setUp()
+        tunnelTests.testActiveTunnelModelInitializationAndCompositeID()
+        tunnelTests.tearDown()
+
+        tunnelTests.setUp()
+        tunnelTests.testNavigationSectionIncludesTunnels()
+        tunnelTests.tearDown()
+
+        print("All TunnelServiceTests passed successfully (2/2 tests)")
     }
 }
 #endif

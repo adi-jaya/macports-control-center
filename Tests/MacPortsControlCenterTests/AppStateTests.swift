@@ -31,10 +31,11 @@ final class AppStateTests: XCTestCase {
 
     func testNavigationSectionsEnumerationAndIdentification() {
         let sections = NavigationSection.allCases
-        XCTAssertEqual(sections.count, 7)
+        XCTAssertEqual(sections.count, 8)
         let rawValues = Set(sections.map { $0.rawValue })
         XCTAssertTrue(rawValues.contains("services"))
         XCTAssertTrue(rawValues.contains("sites"))
+        XCTAssertTrue(rawValues.contains("tunnels"))
         XCTAssertTrue(rawValues.contains("php"))
         XCTAssertTrue(rawValues.contains("database"))
         XCTAssertTrue(rawValues.contains("packages"))

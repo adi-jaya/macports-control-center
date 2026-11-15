@@ -181,3 +181,46 @@ public struct DocItem: Identifiable, Equatable, Hashable {
         self.filePath = filePath
     }
 }
+
+// MARK: - TunnelStatus
+public enum TunnelStatus: String, Codable, Equatable, Hashable {
+    case starting
+    case active
+    case stopped
+    case error
+}
+
+// MARK: - ActiveTunnel
+public struct ActiveTunnel: Identifiable, Equatable, Hashable {
+    public let id: String
+    public let port: String
+    public let label: String
+    public var publicUrl: String?
+    public var status: TunnelStatus
+    public var errorMessage: String?
+    public var startedAt: Date
+    public var isVHost: Bool
+    public var isSSL: Bool
+
+    public init(
+        port: String,
+        label: String,
+        status: TunnelStatus = .starting,
+        isVHost: Bool = false,
+        isSSL: Bool = false,
+        publicUrl: String? = nil,
+        errorMessage: String? = nil,
+        startedAt: Date = Date()
+    ) {
+        self.id = "\(port)_\(label.replacingOccurrences(of: " ", with: "_"))"
+        self.port = port
+        self.label = label
+        self.status = status
+        self.isVHost = isVHost
+        self.isSSL = isSSL
+        self.publicUrl = publicUrl
+        self.errorMessage = errorMessage
+        self.startedAt = startedAt
+    }
+}
+

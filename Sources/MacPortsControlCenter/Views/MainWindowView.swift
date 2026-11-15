@@ -38,6 +38,8 @@ public struct SectionPlaceholderView: View {
                     Text("\(appState.packages.count) packages loaded • \(appState.portSelectGroups.count) port select groups")
                 case .logs:
                     Text("Live log tailer ready for Nginx, PHP-FPM, and MariaDB")
+                case .tunnels:
+                    Text("Cloudflare Quick Tunneling")
                 case .docs:
                     Text("\(appState.docFiles.count) documentation guides available")
                 }
@@ -288,6 +290,8 @@ public struct MainWindowView: View {
             ServicesView()
         case .sites:
             SitesView()
+        case .tunnels:
+            SectionPlaceholderView(section: .tunnels, appState: appState)
         case .php:
             PHPManagerView()
         case .database:
