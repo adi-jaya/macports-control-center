@@ -486,18 +486,12 @@ public struct SitesView: View {
 
     // MARK: - Open in Browser
     private func openInBrowser(_ vhost: VHostItem) {
-        let urlString: String
-        if let appURL = vhost.laravelAppURL, !appURL.isEmpty, appURL.hasPrefix("http") {
-            urlString = appURL
-        } else if vhost.sslEnabled {
-            let port = (vhost.listenPort == "443" || vhost.listenPort.isEmpty) ? "" : ":\(vhost.listenPort)"
-            let host = vhost.serverName.isEmpty ? "localhost" : vhost.serverName.split(separator: " ").first.map(String.init) ?? "localhost"
-            urlString = "https://\(host)\(port)"
-        } else {
-            let port = (vhost.listenPort == "80" || vhost.listenPort.isEmpty) ? "" : ":\(vhost.listenPort)"
-            let host = vhost.serverName.isEmpty ? "localhost" : vhost.serverName.split(separator: " ").first.map(String.init) ?? "localhost"
-            urlString = "http://\(host)\(port)"
-        }
+        let urlString = ConfigFileService.resolveVHostURL(
+            serverName: vhost.serverName,
+            listenPort: vhost.listenPort,
+            sslEnabled: vhost.sslEnabled,
+            laravelAppURL: vhost.laravelAppURL
+        )
 
         if let url = URL(string: urlString) {
             NSWorkspace.shared.open(url)

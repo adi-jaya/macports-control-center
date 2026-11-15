@@ -143,7 +143,31 @@ struct TestRunnerMain {
         configTests.testParseRealHostConfigsIfPresent()
         configTests.tearDown()
 
-        print("All ConfigFileServiceTests passed successfully (8/8 tests)")
+        configTests.setUp()
+        do {
+            try configTests.testParseLaravelEnvDetectsSqliteConnectionWhenDatabaseOmitted()
+        } catch {
+            fatalError("testParseLaravelEnvDetectsSqliteConnectionWhenDatabaseOmitted failed: \(error)")
+        }
+        configTests.tearDown()
+
+        configTests.setUp()
+        configTests.testResolveVHostURLHandlesPortMismatchWithAppURL()
+        configTests.tearDown()
+
+        configTests.setUp()
+        configTests.testResolveVHostURLHandlesSSLAndCustomDomain()
+        configTests.tearDown()
+
+        configTests.setUp()
+        configTests.testResolveVHostURLPreservesSubpathFromAppURL()
+        configTests.tearDown()
+
+        configTests.setUp()
+        configTests.testParseFormulariumRSVirtualHostIfPresent()
+        configTests.tearDown()
+
+        print("All ConfigFileServiceTests passed successfully (13/13 tests)")
 
         print("Running DoctorAndDatabaseTests...")
         let doctorDbTests = DoctorAndDatabaseTests()

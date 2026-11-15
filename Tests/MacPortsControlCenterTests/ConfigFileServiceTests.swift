@@ -192,4 +192,65 @@ final class ConfigFileServiceTests: XCTestCase {
         XCTAssertEqual(parsed?.laravelDatabase, "db_siakurat_sifat")
         XCTAssertEqual(parsed?.laravelAppURL, "http://localhost")
     }
+
+    func testParseLaravelEnvDetectsSqliteConnectionWhenDatabaseOmitted() throws {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let envContent = """
+        APP_NAME="Formularium RS"
+        APP_URL=http://localhost
+        DB_CONNECTION=sqlite
+        # DB_DATABASE=laravel
+        """
+        try envContent.write(to: tmp, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let parsed = ConfigFileService.parseLaravelEnv(at: tmp.path)
+        XCTAssertEqual(parsed.database, "sqlite")
+        XCTAssertEqual(parsed.appURL, "http://localhost")
+    }
+
+    func testResolveVHostURLHandlesPortMismatchWithAppURL() {
+        let url = ConfigFileService.resolveVHostURL(
+            serverName: "localhost 127.0.0.1",
+            listenPort: "8081",
+            sslEnabled: false,
+            laravelAppURL: "http://localhost"
+        )
+        XCTAssertEqual(url, "http://localhost:8081")
+    }
+
+    func testResolveVHostURLHandlesSSLAndCustomDomain() {
+        let url = ConfigFileService.resolveVHostURL(
+            serverName: "formulariumrs.test",
+            listenPort: "443",
+            sslEnabled: true,
+            laravelAppURL: "http://localhost"
+        )
+        XCTAssertEqual(url, "https://formulariumrs.test")
+    }
+
+    func testResolveVHostURLPreservesSubpathFromAppURL() {
+        let url = ConfigFileService.resolveVHostURL(
+            serverName: "localhost 127.0.0.1",
+            listenPort: "8081",
+            sslEnabled: false,
+            laravelAppURL: "http://localhost:8081/subpath"
+        )
+        XCTAssertEqual(url, "http://localhost:8081/subpath")
+    }
+
+    func testParseFormulariumRSVirtualHostIfPresent() {
+        let vhostPath = "/opt/local/etc/nginx/servers/formulariumrs.conf"
+        guard FileManager.default.fileExists(atPath: vhostPath) else { return }
+
+        let parsed = ConfigFileService.parseVHost(filePath: vhostPath)
+        XCTAssertNotEqual(parsed, nil)
+        XCTAssertEqual(parsed?.fileName, "formulariumrs.conf")
+        XCTAssertEqual(parsed?.listenPort, "8081")
+        XCTAssertEqual(parsed?.serverName, "localhost 127.0.0.1")
+        XCTAssertEqual(parsed?.fastcgiPass, "127.0.0.1:9000")
+        XCTAssertEqual(parsed?.sslEnabled, false)
+        XCTAssertEqual(parsed?.laravelDatabase, "sqlite")
+        XCTAssertEqual(parsed?.laravelAppURL, "http://localhost")
+    }
 }

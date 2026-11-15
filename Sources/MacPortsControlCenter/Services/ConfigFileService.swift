@@ -55,6 +55,7 @@ public enum ConfigFileService {
 
         var database: String?
         var appURL: String?
+        var dbConnection: String?
 
         let lines = content.components(separatedBy: .newlines)
         for rawLine in lines {
@@ -93,12 +94,44 @@ public enum ConfigFileService {
 
             if key == "DB_DATABASE" {
                 database = val
+            } else if key == "DB_CONNECTION" {
+                dbConnection = val
             } else if key == "APP_URL" {
                 appURL = val
             }
         }
 
+        if (database == nil || database?.isEmpty == true) && dbConnection?.lowercased() == "sqlite" {
+            database = "sqlite"
+        }
+
         return (database, appURL)
+    }
+
+    // MARK: - Virtual Host URL Resolver
+    public static func resolveVHostURL(
+        serverName: String,
+        listenPort: String,
+        sslEnabled: Bool,
+        laravelAppURL: String? = nil
+    ) -> String {
+        let scheme = sslEnabled ? "https" : "http"
+        let hostToken = serverName.components(separatedBy: .whitespaces).first(where: { !$0.isEmpty }) ?? "localhost"
+        let cleanHost = (hostToken == "_" || hostToken.isEmpty) ? "localhost" : hostToken
+
+        let portSuffix: String
+        if sslEnabled {
+            portSuffix = (listenPort == "443" || listenPort.isEmpty) ? "" : ":\(listenPort)"
+        } else {
+            portSuffix = (listenPort == "80" || listenPort.isEmpty) ? "" : ":\(listenPort)"
+        }
+
+        // Check if laravelAppURL contains a custom subpath (e.g. /subpath or /app)
+        if let appURL = laravelAppURL, let parsed = URL(string: appURL), parsed.path.count > 1 {
+            return "\(scheme)://\(cleanHost)\(portSuffix)\(parsed.path)"
+        }
+
+        return "\(scheme)://\(cleanHost)\(portSuffix)"
     }
 
     // MARK: - Virtual Host Generator
