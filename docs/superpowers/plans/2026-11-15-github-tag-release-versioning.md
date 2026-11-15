@@ -38,15 +38,15 @@
 - Consumes: Riwayat fitur yang telah terimplementasi di repositori
 - Produces: `CHANGELOG.md` dengan section `[Unreleased]` dan `[1.0.0] - 2026-11-15`
 
-- [ ] **Step 1: Tulis draft `CHANGELOG.md` mengikuti standar Keep a Changelog**
+- [x] **Step 1: Tulis draft `CHANGELOG.md` mengikuti standar Keep a Changelog**
   - Section `[Unreleased]` di bagian atas
   - Section `[1.0.0] - 2026-11-15` mencakup:
     - *Added*: 7 visual tabs (Services & Doctor, Sites, PHP, Databases, Packages, Logs, Docs), Menu Bar extra controller dengan live status indicator & actions, in-app privileged elevation helper untuk `mkcert` & `dnsmasq`, automatic PHP extensions discovery, real-time log tailing, multi-architecture build support (Intel x86_64 + Apple Silicon arm64), zero-dependency Swift native architecture.
     - *Changed*: Migrasi dari legacy web viewer PHP ke aplikasi desktop native SwiftUI + AppKit.
     - *Fixed*: Scrolling di NSTextView Docs/Terminal, instant app switcher transitions, permission handling pada pool PHP-FPM user `adijaya:staff`.
-- [ ] **Step 2: Verifikasi file `CHANGELOG.md`**
+- [x] **Step 2: Verifikasi file `CHANGELOG.md`**
   - Pastikan format link versioning di bagian footer valid (`[Unreleased]`, `[1.0.0]`).
-- [ ] **Step 3: Commit `CHANGELOG.md`**
+- [x] **Step 3: Commit `CHANGELOG.md`**
   ```bash
   git add CHANGELOG.md
   git commit -m "docs: add CHANGELOG.md following Keep a Changelog standard"
@@ -64,7 +64,7 @@
 - Consumes: `Resources/Info.plist`, `CHANGELOG.md`, `build-app.sh`, unit test suite
 - Produces: Perintah rilis `./scripts/release.sh <version> [--publish]`
 
-- [ ] **Step 1: Tulis implementasi `scripts/release.sh`**
+- [x] **Step 1: Tulis implementasi `scripts/release.sh`**
   Fitur skrip:
   1. Validasi argumen: `./scripts/release.sh <version> [--publish]` atau `--help`. Sanitasi prefix `v` sehingga `v1.0.1` maupun `1.0.1` diterima.
   2. Validasi branch: Harus berada di branch `main`.
@@ -84,11 +84,11 @@
       - Push commits: `git push origin main`
       - Push tag: `git push origin "v${VERSION}"`
       - Buat GitHub Release: `gh release create "v${VERSION}" --title "v${VERSION}" --notes-file <temp_notes>`
-- [ ] **Step 2: Berikan hak eksekusi `chmod +x scripts/release.sh`**
-- [ ] **Step 3: Uji validasi parameter & error handling pada `scripts/release.sh`**
+- [x] **Step 2: Berikan hak eksekusi `chmod +x scripts/release.sh`**
+- [x] **Step 3: Uji validasi parameter & error handling pada `scripts/release.sh`**
   - Test case: `./scripts/release.sh --help` harus mencetak panduan penggunaan yang jelas.
   - Test case: `./scripts/release.sh` tanpa argumen harus menampilkan pesan error dan usage.
-- [ ] **Step 4: Commit `scripts/release.sh`**
+- [x] **Step 4: Commit `scripts/release.sh`**
   ```bash
   git add scripts/release.sh
   git commit -m "feat(release): add automated local release script with gh release integration"
@@ -107,15 +107,15 @@
 - Consumes: Skrip `scripts/release.sh` dan `CHANGELOG.md`
 - Produces: SOP rilis versi resmi di `AGENTS.md` dan dokumentasi rilis di `README.md`
 
-- [ ] **Step 1: Tambahkan SOP Rilis di `AGENTS.md`**
+- [x] **Step 1: Tambahkan SOP Rilis di `AGENTS.md`**
   - Tambahkan `📋 SOP 6: Release & Versioning Management`
   - Jelaskan aturan Semantic Versioning (`vMAJOR.MINOR.PATCH`).
   - Dokumentasikan alur rilis menggunakan `./scripts/release.sh <version> [--publish]`.
   - Dokumentasikan cara manual rollback atau verifikasi tag.
-- [ ] **Step 2: Perbarui `README.md`**
+- [x] **Step 2: Perbarui `README.md`**
   - Tambahkan informasi versi saat ini dan tautan ke `CHANGELOG.md`.
   - Tambahkan catatan cara merilis versi baru.
-- [ ] **Step 3: Commit dokumentasi**
+- [x] **Step 3: Commit dokumentasi**
   ```bash
   git add AGENTS.md README.md
   git commit -m "docs: document release workflow and SOP in AGENTS.md and README.md"
@@ -132,16 +132,16 @@
 - Consumes: Seluruh commit yang telah siap, `scripts/release.sh`, `gh` CLI
 - Produces: Tag git `v1.0.0` lokal dan remote, serta GitHub Release `v1.0.0` di `adi-jaya/macports-control-center`
 
-- [ ] **Step 1: Jalankan unit test suite lengkap**
+- [x] **Step 1: Jalankan unit test suite lengkap**
   - Pastikan semua 57/57 tests lulus.
-- [ ] **Step 2: Push commit aktif ke remote `origin/main`**
+- [x] **Step 2: Push commit aktif ke remote `origin/main`**
   ```bash
   git push origin main
   ```
-- [ ] **Step 3: Eksekusi rilis `v1.0.0` dengan `--publish`**
+- [x] **Step 3: Eksekusi rilis `v1.0.0` dengan `--publish`**
   ```bash
   ./scripts/release.sh 1.0.0 --publish
   ```
-- [ ] **Step 4: Verifikasi hasil rilis di GitHub**
+- [x] **Step 4: Verifikasi hasil rilis di GitHub**
   - `git tag -l -n` menampilkan tag `v1.0.0`.
   - `gh release view v1.0.0` menampilkan release title, tag, dan notes yang sesuai dengan `CHANGELOG.md`.
