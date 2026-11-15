@@ -39,7 +39,7 @@ public struct SectionPlaceholderView: View {
                 case .logs:
                     Text("Live log tailer ready for Nginx, PHP-FPM, and MariaDB")
                 case .tunnels:
-                    Text("Cloudflare Quick Tunneling")
+                    Text("\(appState.activeTunnels.count) active tunnels")
                 case .docs:
                     Text("\(appState.docFiles.count) documentation guides available")
                 }
@@ -158,6 +158,17 @@ public struct MainWindowView: View {
                                     let running = appState.services.filter(\.isRunning).count
                                     if running > 0 {
                                         Text("\(running)")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 1)
+                                            .background(isSelected ? Color.white.opacity(0.25) : Color.green.opacity(0.2))
+                                            .foregroundColor(isSelected ? .white : .green)
+                                            .cornerRadius(8)
+                                    }
+                                } else if section == .tunnels {
+                                    let activeCount = appState.activeTunnels.filter { $0.value.status == .active }.count
+                                    if activeCount > 0 {
+                                        Text("\(activeCount)")
                                             .font(.system(size: 10, weight: .bold))
                                             .padding(.horizontal, 6)
                                             .padding(.vertical, 1)
@@ -291,7 +302,8 @@ public struct MainWindowView: View {
         case .sites:
             SitesView()
         case .tunnels:
-            SectionPlaceholderView(section: .tunnels, appState: appState)
+            TunnelsView()
+                .environmentObject(appState)
         case .php:
             PHPManagerView()
         case .database:
