@@ -86,6 +86,11 @@ public final class AppState: ObservableObject {
     @Published public private(set) var isMySQLSocketConnected: Bool = false
     @Published public private(set) var installedDatabaseEngines: Set<String> = []
 
+    // MARK: - Cloudflare Quick Tunnels
+    public let tunnelService = TunnelService()
+    @Published public var activeTunnels: [String: ActiveTunnel] = [:]
+    @Published public var isCloudflaredInstalled: Bool = false
+
     // MARK: - Package Caches
     private var cachedInstalledPorts: [PortPackageItem]? = nil
     private var cachedOutdatedPorts: Set<String>? = nil
@@ -142,6 +147,7 @@ public final class AppState: ObservableObject {
         loadDocumentationFiles()
 
         // Optionally trigger initial scan
+        checkCloudflaredInstallation()
         if autoRefreshOnInit {
             Task { [weak self] in
                 await self?.refreshAll()
@@ -544,6 +550,7 @@ public final class AppState: ObservableObject {
     public func refreshAll() async {
         isLoading = true
         defer { isLoading = false }
+        checkCloudflaredInstallation()
 
         // Start concurrent background snapshot reads
         async let psResultTask = commandRunner.run(
@@ -1185,5 +1192,101 @@ public final class AppState: ObservableObject {
         let cmd = DatabaseService.buildImportDatabaseCommand(dbName: name, inputPath: inputPath, socketPath: defaultSocketPath)
         _ = await commandRunner.runShell(cmd, label: "import-db-\(name)")
         await refreshDatabases()
+    }
+
+    // MARK: - Cloudflare Quick Tunnels
+    public func checkCloudflaredInstallation() {
+        self.isCloudflaredInstalled = tunnelService.isCloudflaredInstalled()
+    }
+
+    public func startTunnel(
+        port: String,
+        label: String = "",
+        isVHost: Bool = false,
+        isSSL: Bool = false,
+        hostHeader: String? = nil
+    ) {
+        checkCloudflaredInstallation()
+        let cleanLabel = label.isEmpty ? "Port \(port)" : label
+        let tunnel = ActiveTunnel(
+            port: port,
+            label: cleanLabel,
+            status: .starting,
+            isVHost: isVHost,
+            isSSL: isSSL
+        )
+        let tunnelId = tunnel.id
+        self.activeTunnels[tunnelId] = tunnel
+
+        tunnelService.startTunnel(
+            port: port,
+            label: cleanLabel,
+            isVHost: isVHost,
+            isSSL: isSSL,
+            hostHeader: hostHeader,
+            onUrlDiscovered: { [weak self] url in
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    if var current = self.activeTunnels[tunnelId] {
+                        current.status = .active
+                        current.publicUrl = url
+                        current.errorMessage = nil
+                        self.activeTunnels[tunnelId] = current
+                    }
+                }
+            },
+            onError: { [weak self] err in
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    if var current = self.activeTunnels[tunnelId] {
+                        current.status = .error
+                        current.errorMessage = err
+                        self.activeTunnels[tunnelId] = current
+                    }
+                }
+            },
+            onExit: { [weak self] code in
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    if let current = self.activeTunnels[tunnelId] {
+                        if current.status == .starting {
+                            var updated = current
+                            updated.status = .error
+                            updated.errorMessage = "Process exited prematurely with exit code \(code)"
+                            self.activeTunnels[tunnelId] = updated
+                        } else if current.status == .active {
+                            self.activeTunnels.removeValue(forKey: tunnelId)
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    public func startTunnel(for vhost: VHostItem) {
+        let hostHeader = vhost.serverName.components(separatedBy: " ").first ?? vhost.serverName
+        startTunnel(
+            port: vhost.listenPort,
+            label: vhost.fileName,
+            isVHost: true,
+            isSSL: vhost.sslEnabled,
+            hostHeader: hostHeader
+        )
+    }
+
+    public func stopTunnel(tunnelId: String) {
+        tunnelService.stopTunnel(tunnelId: tunnelId)
+        self.activeTunnels.removeValue(forKey: tunnelId)
+    }
+
+    public func stopAllTunnels() {
+        tunnelService.stopAllTunnels()
+        self.activeTunnels.removeAll()
+    }
+
+    public func installCloudflared() async {
+        isTerminalDrawerExpanded = true
+        _ = await commandRunner.runShell("sudo port install cloudflared", label: "install-cloudflared", serialized: true)
+        checkCloudflaredInstallation()
     }
 }

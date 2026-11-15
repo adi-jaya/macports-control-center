@@ -342,6 +342,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         }
     }
 
+    public func applicationWillTerminate(_ notification: Notification) {
+        appState?.stopAllTunnels()
+    }
+
     // MARK: - System Main Menu
     private func setupMainMenu() {
         let mainMenu = NSMenu()

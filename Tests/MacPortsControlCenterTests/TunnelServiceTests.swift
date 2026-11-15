@@ -63,4 +63,18 @@ final class TunnelServiceTests: XCTestCase {
         XCTAssertNotNil(path)
         XCTAssertTrue(path?.contains("cloudflared") == true)
     }
+
+    @MainActor
+    func testAppStateTunnelLifecycleMethods() async {
+        let appState = AppState(autoRefreshOnInit: false)
+        appState.checkCloudflaredInstallation()
+        XCTAssertTrue(appState.isCloudflaredInstalled)
+
+        let testId = "9999_test-unit"
+        appState.activeTunnels[testId] = ActiveTunnel(port: "9999", label: "test-unit", status: .active)
+        XCTAssertEqual(appState.activeTunnels.count, 1)
+
+        appState.stopTunnel(tunnelId: testId)
+        XCTAssertNil(appState.activeTunnels[testId])
+    }
 }

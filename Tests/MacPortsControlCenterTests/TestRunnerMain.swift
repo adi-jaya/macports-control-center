@@ -323,7 +323,11 @@ struct TestRunnerMain {
         tunnelTests.testBinaryDiscoveryChecksMultipleLocations()
         tunnelTests.tearDown()
 
-        print("All TunnelServiceTests passed successfully (6/6 tests)")
+        tunnelTests.setUp()
+        await tunnelTests.testAppStateTunnelLifecycleMethods()
+        tunnelTests.tearDown()
+
+        print("All TunnelServiceTests passed successfully (7/7 tests)")
     }
 }
 #endif
