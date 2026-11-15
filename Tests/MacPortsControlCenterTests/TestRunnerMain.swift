@@ -307,7 +307,23 @@ struct TestRunnerMain {
         tunnelTests.testNavigationSectionIncludesTunnels()
         tunnelTests.tearDown()
 
-        print("All TunnelServiceTests passed successfully (2/2 tests)")
+        tunnelTests.setUp()
+        tunnelTests.testExtractTunnelURLFromRealisticCloudflareLog()
+        tunnelTests.tearDown()
+
+        tunnelTests.setUp()
+        tunnelTests.testBuildProcessArgumentsForHTTPAndViteHostHeader()
+        tunnelTests.tearDown()
+
+        tunnelTests.setUp()
+        tunnelTests.testBuildProcessArgumentsForHTTPSVHostWithNoTLSVerify()
+        tunnelTests.tearDown()
+
+        tunnelTests.setUp()
+        tunnelTests.testBinaryDiscoveryChecksMultipleLocations()
+        tunnelTests.tearDown()
+
+        print("All TunnelServiceTests passed successfully (6/6 tests)")
     }
 }
 #endif

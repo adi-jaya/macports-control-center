@@ -24,4 +24,43 @@ final class TunnelServiceTests: XCTestCase {
         XCTAssertEqual(NavigationSection.tunnels.displayName, "Tunnels")
         XCTAssertEqual(NavigationSection.tunnels.systemImage, "antenna.radiowaves.left.and.right")
     }
+
+    func testExtractTunnelURLFromRealisticCloudflareLog() {
+        let sampleLog = """
+        2026-11-14T17:22:52Z INF Requesting new quick Tunnel on trycloudflare.com...
+        2026-11-14T17:22:58Z INF +--------------------------------------------------------------------------------------------+
+        2026-11-14T17:22:58Z INF |  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |
+        2026-11-14T17:22:58Z INF |  https://pump-trading-tiny-opposition.trycloudflare.com                                    |
+        2026-11-14T17:22:58Z INF +--------------------------------------------------------------------------------------------+
+        """
+        let extracted = TunnelService.extractTunnelURL(from: sampleLog)
+        XCTAssertEqual(extracted, "https://pump-trading-tiny-opposition.trycloudflare.com")
+    }
+
+    func testBuildProcessArgumentsForHTTPAndViteHostHeader() {
+        let args = TunnelService.buildProcessArguments(port: "5173", isSSL: false, hostHeader: "localhost")
+        XCTAssertEqual(args, [
+            "tunnel",
+            "--url", "http://127.0.0.1:5173",
+            "--no-autoupdate",
+            "--http-host-header", "localhost"
+        ])
+    }
+
+    func testBuildProcessArgumentsForHTTPSVHostWithNoTLSVerify() {
+        let args = TunnelService.buildProcessArguments(port: "8082", isSSL: true, hostHeader: "my-secure.test")
+        XCTAssertEqual(args, [
+            "tunnel",
+            "--url", "https://127.0.0.1:8082",
+            "--no-autoupdate",
+            "--no-tls-verify",
+            "--http-host-header", "my-secure.test"
+        ])
+    }
+
+    func testBinaryDiscoveryChecksMultipleLocations() {
+        let path = TunnelService.findBinaryPath()
+        XCTAssertNotNil(path)
+        XCTAssertTrue(path?.contains("cloudflared") == true)
+    }
 }
