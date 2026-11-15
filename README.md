@@ -1,9 +1,11 @@
 # 📚 MacPorts Control Center & Pusat Dokumentasi Web Dev
 
 [![GitHub Repository](https://img.shields.io/badge/GitHub-adi--jaya%2Fmacports--control--center-181717?style=flat&logo=github)](https://github.com/adi-jaya/macports-control-center)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
+[![Keep a Changelog](https://img.shields.io/badge/changelog-Keep%20a%20Changelog-orange.svg)](CHANGELOG.md)
 [![macOS Monterey](https://img.shields.io/badge/macOS-Monterey%2012.7%2B%20(Intel%20x86__64)-0078D7?logo=apple)](https://apple.com)
 [![Swift Native](https://img.shields.io/badge/App-SwiftUI%20%2B%20AppKit%20(Native)-FA7343?logo=swift)](build-app.sh)
-[![Tests](https://img.shields.io/badge/Tests-42%2F42%20Passing-success)](Tests/)
+[![Tests](https://img.shields.io/badge/Tests-78%2F78%20Passing-success)](Tests/)
 
 Selamat datang di repositori **MacPorts Control Center** dan pusat dokumentasi lingkungan web development native berbasis **MacPorts** pada **macOS Monterey 12.7.6 (Intel x86_64)**. Repositori publik ini tersinkronisasi di [**github.com/adi-jaya/macports-control-center**](https://github.com/adi-jaya/macports-control-center).
 
@@ -54,8 +56,23 @@ Aplikasi tetap berjalan di Menu Bar macOS dengan status indicator dinamis bahkan
 open "build/MacPorts Control Center.app"
 # atau: open -a "MacPorts Control Center"
 
-# 4. Jalankan rangkaian unit test suite (42/42 tests passing)
+# 4. Jalankan rangkaian unit test suite (78/78 tests passing)
 TEST_RUNNER=1 /tmp/run-all-tests
+```
+
+### 🚀 Rilis & Versioning Aplikasi
+
+Aplikasi mematuhi standar [Semantic Versioning](https://semver.org) dan riwayat perubahan dicatat di [`CHANGELOG.md`](CHANGELOG.md). Skrip [`scripts/release.sh`](scripts/release.sh) mengotomasi validasi unit test, pembaruan versi `Info.plist`, kompilasi release bundle, git commit, annotated git tag (`vX.Y.Z`), dan publikasi GitHub Release via GitHub CLI (`gh`):
+
+```bash
+# 1. Simulasi rilis (dry-run):
+./scripts/release.sh 1.0.0 --dry-run
+
+# 2. Rilis lokal (eksekusi test, update Info.plist, build app, commit & tag lokal):
+./scripts/release.sh 1.0.0
+
+# 3. Rilis penuh ke GitHub (push origin main, push tag, dan publikasikan GitHub Release):
+./scripts/release.sh 1.0.0 --publish
 ```
 
 ### 🎨 Mengelola & Menyesuaikan Icon Aplikasi (AppIcon)
@@ -82,9 +99,10 @@ Aplikasi telah dilengkapi bundle metadata (`Resources/Info.plist`) dan icon bawa
 | 📄 [**`FRESH_INSTALL_GUIDE.md`**](FRESH_INSTALL_GUIDE.md) | **Panduan Setup Laravel dari Nol:** Tutorial komprehensif setup lingkungan Laravel di Mac baru/reinstall, manajemen multi-versi PHP (8.1 s/d 8.4+), isolasi concurrent FPM pools, manajemen MariaDB/MySQL, dan uninstaller bersih. |
 | 📄 [`FINAL_MACPORTS_ENVIRONMENT_SETUP.md`](FINAL_MACPORTS_ENVIRONMENT_SETUP.md) | **Dokumentasi Utama:** Detail teknis stack yang saat ini aktif (PHP 8.3, Nginx, MariaDB, Composer, Node), port/socket, dan status layanan. |
 | 📄 [`HANDOFF_MACPORTS_MIGRATION.md`](HANDOFF_MACPORTS_MIGRATION.md) | **Riwayat & Latar Belakang:** Catatan teknis migrasi dari FlyEnv dan Herd (alasan inkompatibilitas C++ SDK macOS Monterey, migrasi 24 database). |
+| 📄 [**`CHANGELOG.md`**](CHANGELOG.md) | **Riwayat Versi & Rilis:** Catatan perubahan per rilis (Added, Changed, Fixed, Security) mengikuti format standar *Keep a Changelog* dan Semantic Versioning. |
 | 📄 [**`AGENTS.md`**](AGENTS.md) | **Petunjuk & Aturan AI Agents:** Pedoman arsitektur, guardrails, konvensi hak akses file, dan perintah terminal untuk AI coding assistant. |
 | 📁 [`Resources/`](Resources/) | **Resource Bundel macOS:** Berisi metadata aplikasi [`Resources/Info.plist`](Resources/Info.plist) dan berkas icon resmi [`Resources/AppIcon.icns`](Resources/AppIcon.icns). |
-| 📁 [`scripts/`](scripts/) | **Koleksi Skrip Otomasi:** Berisi skrip shell yang digunakan selama proses migrasi serta utilitas developer ([`scripts/generate_icon.sh`](scripts/generate_icon.sh), `setup_webserver.sh`, `migrate_mariadb.sh`, `cleanup_herd_root.sh`, `cleanup_flyenv_root.sh`). |
+| 📁 [`scripts/`](scripts/) | **Koleksi Skrip Otomasi:** Berisi skrip shell rilis ([`scripts/release.sh`](scripts/release.sh)), generator icon ([`scripts/generate_icon.sh`](scripts/generate_icon.sh)), serta skrip migrasi webserver/database. |
 | 📁 [`config_templates/`](config_templates/) | **Salinan Konfigurasi:** Template cadangan `nginx.conf`, `php.ini`, `php-fpm.conf`, `www.conf`, dan contoh blok vhost server. |
 
 ---

@@ -26,8 +26,8 @@ Repositori dokumentasi ini dibangun dengan pendekatan *zero-dependency build* (t
 | **Backend Web Viewer** | **PHP** (Native 8.3+) | [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php) | Mini-controller mandiri tanpa framework. Menangani routing `?file=`, sanitasi input, membaca markdown via `file_get_contents`, dan menyajikan konten ke frontend dalam format JSON. |
 | **Frontend Markdown Parser** | **JavaScript (ES6+)** | [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php) | Parsing Markdown ke elemen DOM secara dinamis di browser menggunakan CDN [`marked.js`](https://cdn.jsdelivr.net/npm/marked/marked.min.js) (*no build step*). |
 | **Styling & Antarmuka** | **HTML5 & CSS3** | [`index.php`](file:///Users/adijaya/Documents/MacPorts_Docs/index.php) | Tata letak Flexbox modern dengan *Dark Theme* (`#0f172a`, `#1e293b`, `#38bdf8`), tipografi Apple System Font, styling tabel Markdown, dan navigasi sidebar interaktif. |
-| **Skrip Otomasi Sistem** | **POSIX Bash Shell** | [`scripts/*.sh`](file:///Users/adijaya/Documents/MacPorts_Docs/scripts) | Skrip shell (`#!/bin/bash` dengan `set -e`) untuk sinkronisasi database (`rsync`), konfigurasi direktori sistem (`chown`/`chmod`), dan manajemen launch daemon (`launchctl`). |
-| **Format Dokumentasi** | **Markdown (GFM)** | `*.md` | Menggunakan GitHub Flavored Markdown (tabel, badge, blockquotes, syntax highlighting) yang dirender serentak di GitHub dan web viewer lokal. |
+| **Skrip Otomasi Sistem** | **POSIX Bash Shell** | [`scripts/*.sh`](file:///Users/adijaya/Documents/MacPorts_Docs/scripts)<br>[`scripts/release.sh`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/scripts/release.sh) | Skrip shell (`#!/bin/bash` dengan `set -e`) untuk sinkronisasi database (`rsync`), konfigurasi direktori sistem (`chown`/`chmod`), manajemen launch daemon (`launchctl`), dan otomasi rilis SemVer (`scripts/release.sh`). |
+| **Format Dokumentasi** | **Markdown (GFM)** | `*.md`<br>[`CHANGELOG.md`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/CHANGELOG.md) | Menggunakan GitHub Flavored Markdown (tabel, badge, blockquotes, syntax highlighting) dan standar *Keep a Changelog* untuk riwayat versi aplikasi. |
 | **Konfigurasi Server** | **Nginx Conf & INI** | [`config_templates/`](file:///Users/adijaya/Documents/MacPorts_Docs/config_templates) | Sintaks konfigurasi server block Nginx (`.conf`), runtime PHP (`php.ini`), dan pool PHP-FPM (`www.conf`). |
 | **Version Control** | **Git** | `.git/`, `.gitignore` | Pelacakan versi dan sinkronisasi ke remote GitHub `origin/main`. |
 
@@ -66,7 +66,8 @@ Konsultasikan dokumen berikut hanya saat pemicu (*trigger*) yang relevan aktif:
 | [`FINAL_MACPORTS_ENVIRONMENT_SETUP.md`](file:///Users/adijaya/Documents/MacPorts_Docs/FINAL_MACPORTS_ENVIRONMENT_SETUP.md) | **Audit Snapshot Host:** Saat memverifikasi versi komponen aktif, alokasi port default, atau riwayat database terpasang. | Status teruji: PHP 8.3.36, Nginx 1.30.6, MariaDB 10.11.19, Composer 2.8.12, Node v24 via fnm. |
 | [`HANDOFF_MACPORTS_MIGRATION.md`](file:///Users/adijaya/Documents/MacPorts_Docs/HANDOFF_MACPORTS_MIGRATION.md) | **Riset Historis Keputusan:** Saat membutuhkan latar belakang mengapa FlyEnv atau Herd ditinggalkan. | Catatan bug SDK macOS 15+ libcpp pada Herd (Issue #1600) dan migrasi 24 database FlyEnv. |
 | [`config_templates/`](file:///Users/adijaya/Documents/MacPorts_Docs/config_templates) | **Sinkronisasi Konfigurasi Acuan:** Saat memperbarui template standar `nginx.conf`, `php.ini`, atau `www.conf`. | Salinan acuan (BUKAN file aktif runtime sistem di `/opt/local/etc/`). |
-| [`scripts/`](file:///Users/adijaya/Documents/MacPorts_Docs/scripts) | **Eksekusi Otomasi Host:** Saat setup webserver awal atau migrasi fisik MariaDB. | Skrip Bash POSIX: `setup_webserver.sh`, `migrate_mariadb.sh`, `cleanup_herd_root.sh`, `cleanup_flyenv_root.sh`. |
+| [`CHANGELOG.md`](file:///Users/adijaya/MyFiles/Projects/macports-control-center/CHANGELOG.md) | **Audit Versi & Rilis:** Saat memverifikasi perubahan antar rilis, menyiapkan rilis baru, atau memeriksa changelog historis. | Riwayat rilis berbasis SemVer (`vX.Y.Z`) mengikuti standar *Keep a Changelog* (Added, Changed, Fixed, Security). |
+| [`scripts/`](file:///Users/adijaya/Documents/MacPorts_Docs/scripts) | **Eksekusi Otomasi Host:** Saat setup webserver awal atau migrasi fisik MariaDB. | Skrip Bash POSIX: `setup_webserver.sh`, `migrate_mariadb.sh`, `cleanup_herd_root.sh`, `cleanup_flyenv_root.sh`, `release.sh`. |
 
 ---
 
@@ -170,6 +171,36 @@ Konsultasikan dokumen berikut hanya saat pemicu (*trigger*) yang relevan aktif:
 4. **Completion Criterion:**
    - `Resources/AppIcon.icns` terpasang di `build/MacPorts Control Center.app/Contents/Resources/AppIcon.icns`.
    - Jalankan `open "build/MacPorts Control Center.app"` dan pastikan icon tampil di Dock dan Finder.
+
+### 📋 SOP 6: Manajemen Rilis & Versioning (Git Tag & GitHub Releases)
+1. **Konvensi Versi (Semantic Versioning):**
+   - Format: `vMAJOR.MINOR.PATCH` (contoh: `v1.0.0`, `v1.0.1`, `v1.1.0`).
+   - `Resources/Info.plist` menyimpan versi bersih tanpa `v` pada `CFBundleShortVersionString` dan integer inkremental pada `CFBundleVersion`.
+2. **Siapkan Catatan Rilis di `CHANGELOG.md`:**
+   - Tambahkan heading versi baru di bawah `## [Unreleased]`:
+     ```markdown
+     ## [1.0.X] - YYYY-MM-DD
+
+     ### Added
+     - ...
+     ### Fixed
+     - ...
+     ```
+3. **Eksekusi Rilis via Skrip Otomasi:**
+   ```bash
+   # Simulasi validasi dan pemeriksaan test:
+   ./scripts/release.sh 1.0.X --dry-run
+
+   # Rilis lokal (uji test, bump Info.plist, rebuild app, git commit & tag):
+   ./scripts/release.sh 1.0.X
+
+   # Rilis penuh (push origin main, push tag, dan publikasikan ke GitHub Release via gh CLI):
+   ./scripts/release.sh 1.0.X --publish
+   ```
+4. **Completion Criterion:**
+   - Test suite (78/78) lulus 100%.
+   - Git tag teranotasi `vX.Y.Z` berhasil dibuat: `git tag -l -n`.
+   - Jika dipublikasikan (`--publish`), GitHub Release aktif dapat diverifikasi via `gh release view vX.Y.Z`.
 
 ---
 
