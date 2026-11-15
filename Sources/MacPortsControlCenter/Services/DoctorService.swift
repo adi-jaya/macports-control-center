@@ -173,16 +173,23 @@ public struct DoctorService {
         carootPath: String,
         mkcertBinary: String = "/opt/local/bin/mkcert"
     ) -> String {
-        let safeUser = currentUser.trimmingCharacters(in: .whitespacesAndNewlines)
-        let safeCaroot = carootPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedUser = currentUser.trimmingCharacters(in: .whitespacesAndNewlines)
+        let safeUser = trimmedUser.isEmpty ? NSUserName() : trimmedUser
         let escapedUser = safeUser.replacingOccurrences(of: "'", with: "'\\''")
-        let escapedCaroot = safeCaroot.replacingOccurrences(of: "'", with: "'\\''")
 
-        return """
-        mkdir -p '\(escapedCaroot)' && \
-        CAROOT='\(escapedCaroot)' \(mkcertBinary) -install && \
-        chown -R '\(escapedUser):staff' '\(escapedCaroot)'
-        """
+        let trimmedCaroot = carootPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedCaroot.isEmpty && trimmedCaroot.replacingOccurrences(of: "/", with: "").count > 0 else {
+            return ""
+        }
+        let escapedCaroot = trimmedCaroot.replacingOccurrences(of: "'", with: "'\\''")
+        let escapedBinary = mkcertBinary.replacingOccurrences(of: "'", with: "'\\''")
+
+        var commands: [String] = []
+        commands.append("mkdir -p '\(escapedCaroot)'")
+        commands.append("CAROOT='\(escapedCaroot)' '\(escapedBinary)' -install")
+        commands.append("chown -R '\(escapedUser):staff' '\(escapedCaroot)'")
+
+        return commands.joined(separator: " && ")
     }
 
     /// Builds privileged script to configure dnsmasq.conf and create /etc/resolver/test atomically
@@ -207,6 +214,7 @@ public struct DoctorService {
                 return "'\(escapedLine)'"
             }
             if !lines.isEmpty {
+                commands.append("[ -s '\(escapedConf)' ] && [ -n \"$(tail -c 1 '\(escapedConf)')\" ] && printf '\\n' >> '\(escapedConf)' || true")
                 commands.append("printf '%s\\n' \(lines.joined(separator: " ")) >> '\(escapedConf)'")
             }
         }

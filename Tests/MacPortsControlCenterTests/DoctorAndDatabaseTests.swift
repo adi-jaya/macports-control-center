@@ -179,17 +179,25 @@ final class DoctorAndDatabaseTests: XCTestCase {
             carootPath: "/Users/adijaya/Library/Application Support/mkcert"
         )
         XCTAssertTrue(script.contains("mkdir -p '/Users/adijaya/Library/Application Support/mkcert'"))
-        XCTAssertTrue(script.contains("CAROOT='/Users/adijaya/Library/Application Support/mkcert' /opt/local/bin/mkcert -install"))
+        XCTAssertTrue(script.contains("CAROOT='/Users/adijaya/Library/Application Support/mkcert' '/opt/local/bin/mkcert' -install"))
         XCTAssertTrue(script.contains("chown -R 'adijaya:staff' '/Users/adijaya/Library/Application Support/mkcert'"))
 
-        // Escaping test with spaces or quotes
+        // Escaping test with spaces and single quotes
         let quoted = DoctorService.buildMkcertInstallScript(
-            currentUser: "john doe",
-            carootPath: "/Users/john doe/Library/Application Support/mkcert"
+            currentUser: "o'connor",
+            carootPath: "/Users/o'connor/Library/Application Support/mkcert",
+            mkcertBinary: "/opt/local/bin/custom mkcert"
         )
-        XCTAssertTrue(quoted.contains("mkdir -p '/Users/john doe/Library/Application Support/mkcert'"))
-        XCTAssertTrue(quoted.contains("CAROOT='/Users/john doe/Library/Application Support/mkcert'"))
-        XCTAssertTrue(quoted.contains("chown -R 'john doe:staff'"))
+        XCTAssertTrue(quoted.contains("mkdir -p '/Users/o'\\''connor/Library/Application Support/mkcert'"))
+        XCTAssertTrue(quoted.contains("CAROOT='/Users/o'\\''connor/Library/Application Support/mkcert'"))
+        XCTAssertTrue(quoted.contains("'/opt/local/bin/custom mkcert' -install"))
+        XCTAssertTrue(quoted.contains("chown -R 'o'\\''connor:staff'"))
+
+        // Boundary guards
+        XCTAssertEqual(DoctorService.buildMkcertInstallScript(currentUser: "adijaya", carootPath: ""), "")
+        XCTAssertEqual(DoctorService.buildMkcertInstallScript(currentUser: "adijaya", carootPath: "   "), "")
+        XCTAssertEqual(DoctorService.buildMkcertInstallScript(currentUser: "adijaya", carootPath: "/"), "")
+        XCTAssertEqual(DoctorService.buildMkcertInstallScript(currentUser: "adijaya", carootPath: "///"), "")
     }
 
     func testBuildDnsmasqPrivilegedSetupScript() {
@@ -203,7 +211,8 @@ final class DoctorAndDatabaseTests: XCTestCase {
         )
         XCTAssertTrue(scriptWithAppend.contains("mkdir -p '/etc/resolver'"))
         XCTAssertTrue(scriptWithAppend.contains("echo 'nameserver 127.0.0.1' > '/etc/resolver/test'"))
-        XCTAssertTrue(scriptWithAppend.contains(">> '/opt/local/etc/dnsmasq.conf'"))
+        XCTAssertTrue(scriptWithAppend.contains("[ -s '/opt/local/etc/dnsmasq.conf' ]"))
+        XCTAssertTrue(scriptWithAppend.contains("printf '%s\\n' 'address=/.test/127.0.0.1' 'listen-address=127.0.0.1' >> '/opt/local/etc/dnsmasq.conf'"))
 
         let scriptWithoutAppend = DoctorService.buildDnsmasqPrivilegedSetupScript(
             dnsmasqConfPath: "/opt/local/etc/dnsmasq.conf",

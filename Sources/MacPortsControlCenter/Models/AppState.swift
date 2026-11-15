@@ -1008,7 +1008,14 @@ public final class AppState: ObservableObject {
             needsConfigAppend: needsConfigAppend
         )
         let adminArgs = DoctorService.buildOsascriptAdminCommand(shellScript: script)
-        _ = await commandRunner.run(executable: DoctorService.osascriptBinary, arguments: adminArgs, label: "setup-resolver-dnsmasq")
+        let adminResult = await commandRunner.run(executable: DoctorService.osascriptBinary, arguments: adminArgs, label: "setup-resolver-dnsmasq")
+
+        // Only load service if elevation succeeded (not cancelled by user)
+        guard adminResult.exitCode == 0 else {
+            invalidatePackageCaches()
+            await refreshServices()
+            return
+        }
 
         _ = await commandRunner.runShell("sudo -n /opt/local/bin/port load dnsmasq", label: "load-dnsmasq")
         invalidatePackageCaches()
@@ -1016,10 +1023,23 @@ public final class AppState: ObservableObject {
     }
 
     public func setupMkcert() async {
-        _ = await commandRunner.runShell("sudo -n /opt/local/bin/port install mkcert", label: "install-mkcert")
+        let installResult = await commandRunner.runShell("sudo -n /opt/local/bin/port install mkcert", label: "install-mkcert")
+        guard installResult.exitCode == 0 ||
+              FileManager.default.fileExists(atPath: "/opt/local/bin/mkcert") ||
+              FileManager.default.fileExists(atPath: "/usr/local/bin/mkcert") else {
+            invalidatePackageCaches()
+            return
+        }
+
         let currentUser = NSUserName()
         let carootPath = ("~/Library/Application Support/mkcert" as NSString).expandingTildeInPath
-        let script = DoctorService.buildMkcertInstallScript(currentUser: currentUser, carootPath: carootPath)
+        let mkcertPath = FileManager.default.fileExists(atPath: "/opt/local/bin/mkcert") ? "/opt/local/bin/mkcert" : "/usr/local/bin/mkcert"
+        let script = DoctorService.buildMkcertInstallScript(currentUser: currentUser, carootPath: carootPath, mkcertBinary: mkcertPath)
+        guard !script.isEmpty else {
+            invalidatePackageCaches()
+            return
+        }
+
         let adminArgs = DoctorService.buildOsascriptAdminCommand(shellScript: script)
         _ = await commandRunner.run(executable: DoctorService.osascriptBinary, arguments: adminArgs, label: "setup-mkcert-ca")
         invalidatePackageCaches()

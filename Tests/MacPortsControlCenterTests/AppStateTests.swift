@@ -198,7 +198,7 @@ final class AppStateTests: XCTestCase {
         let state = AppState(autoRefreshOnInit: false)
         await state.setupMkcert()
         let ranOsascript = state.commandRunner.terminalLines.contains { line in
-            line.contains("osascript") && line.contains("mkcert -install")
+            line.contains("osascript") && line.contains("mkcert") && line.contains("-install")
         }
         XCTAssertTrue(ranOsascript, "Expected setupMkcert to use osascript for mkcert -install")
     }
