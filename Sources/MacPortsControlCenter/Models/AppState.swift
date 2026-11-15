@@ -1247,20 +1247,23 @@ public final class AppState: ObservableObject {
             },
             onExit: { [weak self] code in
                 Task { @MainActor [weak self] in
-                    guard let self = self else { return }
-                    if let current = self.activeTunnels[tunnelId] {
-                        if current.status == .starting {
-                            var updated = current
-                            updated.status = .error
-                            updated.errorMessage = "Process exited prematurely with exit code \(code)"
-                            self.activeTunnels[tunnelId] = updated
-                        } else if current.status == .active {
-                            self.activeTunnels.removeValue(forKey: tunnelId)
-                        }
-                    }
+                    self?.handleTunnelExit(tunnelId: tunnelId, exitCode: code)
                 }
             }
         )
+    }
+
+    public func handleTunnelExit(tunnelId: String, exitCode: Int32) {
+        if let current = self.activeTunnels[tunnelId] {
+            var updated = current
+            updated.status = .error
+            if current.status == .starting {
+                updated.errorMessage = "Process exited prematurely with exit code \(exitCode)"
+            } else {
+                updated.errorMessage = "Tunnel disconnected unexpectedly (exit code \(exitCode))"
+            }
+            self.activeTunnels[tunnelId] = updated
+        }
     }
 
     public func startTunnel(for vhost: VHostItem) {

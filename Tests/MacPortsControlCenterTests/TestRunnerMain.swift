@@ -327,7 +327,11 @@ struct TestRunnerMain {
         await tunnelTests.testAppStateTunnelLifecycleMethods()
         tunnelTests.tearDown()
 
-        print("All TunnelServiceTests passed successfully (7/7 tests)")
+        tunnelTests.setUp()
+        tunnelTests.testActiveTunnelTransitionsToErrorOnUnexpectedTermination()
+        tunnelTests.tearDown()
+
+        print("All TunnelServiceTests passed successfully (8/8 tests)")
     }
 }
 #endif

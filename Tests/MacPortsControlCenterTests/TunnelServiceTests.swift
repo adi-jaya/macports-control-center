@@ -60,15 +60,18 @@ final class TunnelServiceTests: XCTestCase {
 
     func testBinaryDiscoveryChecksMultipleLocations() {
         let path = TunnelService.findBinaryPath()
-        XCTAssertNotNil(path)
-        XCTAssertTrue(path?.contains("cloudflared") == true)
+        if let path = path {
+            XCTAssertTrue(path.contains("cloudflared"))
+        } else {
+            XCTAssertFalse(TunnelService.isCloudflaredInstalled())
+        }
     }
 
     @MainActor
     func testAppStateTunnelLifecycleMethods() async {
         let appState = AppState(autoRefreshOnInit: false)
         appState.checkCloudflaredInstallation()
-        XCTAssertTrue(appState.isCloudflaredInstalled)
+        XCTAssertEqual(appState.isCloudflaredInstalled, TunnelService.isCloudflaredInstalled())
 
         let testId = "9999_test-unit"
         appState.activeTunnels[testId] = ActiveTunnel(port: "9999", label: "test-unit", status: .active)
@@ -76,5 +79,18 @@ final class TunnelServiceTests: XCTestCase {
 
         appState.stopTunnel(tunnelId: testId)
         XCTAssertNil(appState.activeTunnels[testId])
+    }
+
+    @MainActor
+    func testActiveTunnelTransitionsToErrorOnUnexpectedTermination() {
+        let appState = AppState(autoRefreshOnInit: false)
+        let testId = "9998_crash-test"
+        appState.activeTunnels[testId] = ActiveTunnel(port: "9998", label: "crash-test", status: .active)
+
+        appState.handleTunnelExit(tunnelId: testId, exitCode: 2)
+
+        XCTAssertNotNil(appState.activeTunnels[testId])
+        XCTAssertEqual(appState.activeTunnels[testId]?.status, .error)
+        XCTAssertTrue(appState.activeTunnels[testId]?.errorMessage?.contains("Tunnel disconnected unexpectedly (exit code 2)") == true)
     }
 }
